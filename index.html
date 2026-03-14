@@ -6,6 +6,7 @@
 <title>Registro de Asistencia</title>
 <!-- ── SUPABASE: reemplaza Google Apps Script backend ── -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script>
 // ═══════════════════════════════════════════════════════════════════
 //  SUPABASE BACKEND v3.1 — embebido inline
@@ -2038,6 +2039,13 @@ body.noche-mode .modal-field input,body.noche-mode .modal-field select{color-sch
       <div class="reg-btns">
         <button class="btn btn-primary btn-sm" onclick="_registrosCargados=false;cargarRegistros()">↻ Actualizar</button>
         <button class="btn btn-pdf btn-sm" onclick="exportarPDF()">📄 Exportar PDF</button>
+        <button class="btn btn-sm" onclick="exportarRegistrosExcel()"
+          style="background:linear-gradient(135deg,#1a7a3a,#27ae60);color:#fff;font-weight:700"
+          title="Exporta en Excel los registros del filtro actual">🟢 Excel</button>
+        <button id="btnEliminarSel" onclick="confirmarEliminarSeleccion()"
+          style="display:none;background:var(--danger);color:#fff;border:none;border-radius:6px;padding:4px 10px;font-size:12px;font-weight:700;cursor:pointer">
+          🗑 Eliminar (<span id="cntSel">0</span>)
+        </button>
       </div>
     </div>
     <!-- Fila 2: filtros -->
@@ -2083,6 +2091,11 @@ body.noche-mode .modal-field input,body.noche-mode .modal-field select{color-sch
   <div class="table-wrap">
     <table id="tablaReg">
       <thead><tr>
+        <th class="no-sort" style="width:36px;text-align:center;padding:6px">
+          <input type="checkbox" id="chkTodos" title="Seleccionar todos"
+            onchange="toggleTodosSel(this.checked)"
+            style="width:15px;height:15px;cursor:pointer;accent-color:#e05252;vertical-align:middle">
+        </th>
         <th class="no-sort" style="min-width:90px;text-align:center">Acciones</th>
         <th onclick="sortTable('estado')" style="min-width:100px;text-align:center;cursor:pointer" id="thEstado">Estado ↕</th>
         <th onclick="sortTable(1)">Fecha ↕</th>
@@ -2104,7 +2117,7 @@ body.noche-mode .modal-field input,body.noche-mode .modal-field select{color-sch
         <th>C. Inicio</th><th>C. Término</th><th>Colación</th>
       </tr></thead>
       <tbody id="tbodyReg">
-        <tr><td colspan="25"><div class="empty-state"><div class="ei">📭</div><p>Cargando...</p></div></td></tr>
+        <tr><td colspan="26"><div class="empty-state"><div class="ei">📭</div><p>Cargando...</p></div></td></tr>
       </tbody>
     </table>
   </div>
@@ -3643,7 +3656,7 @@ function renderTabla(rows){
                   : mostr+' de '+total+' registros';
 
   if(!rows.length){
-    tbody.innerHTML='<tr><td colspan="25"><div class="empty-state"><div class="ei">🔍</div><p>Sin resultados con los filtros actuales.</p></div></td></tr>';
+    tbody.innerHTML='<tr><td colspan="26"><div class="empty-state"><div class="ei">🔍</div><p>Sin resultados con los filtros actuales.</p></div></td></tr>';
     return;
   }
 
@@ -3688,7 +3701,12 @@ function renderTabla(rows){
       ? `<td title="Registro duplicado por ${motivo} en esta fecha"><span class="dup-badge">${dupIcon} Duplicado</span></td>`
       : '<td></td>';
 
-    return `<tr${trClass}>`+
+    return `<tr${trClass} id="regfila-${rowId}">` +
+      '<td style="text-align:center;padding:5px 4px;background:var(--card)">'+
+        '<input type="checkbox" class="chk-reg" value="'+rowId+'" data-idx="'+realIdx+'"'+
+        ' onchange="actualizarSelReg()"'+
+        ' style="width:15px;height:15px;cursor:pointer;accent-color:#e05252;vertical-align:middle">'+
+      '</td>'+
       '<td style="text-align:center;background:var(--card)">'+
         '<div class="row-actions">'+
           '<button class="btn-edit" onclick="abrirEditar('+realIdx+',\''+rowId+'\')" title="Editar">✏️</button>'+
@@ -3721,6 +3739,11 @@ function renderTabla(rows){
       '<td>'+fmtBool(r[22])+'</td>'+
       '</tr>';
   }).join('');
+
+  // Reset checkbox maestro tras renderizar
+  var cm = document.getElementById('chkTodos');
+  if(cm){ cm.checked=false; cm.indeterminate=false; }
+  actualizarSelReg();
 }
 
 function esc(v){if(v==null||v==='')return '—';return String(v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
@@ -3847,6 +3870,7 @@ function guardarEdicion(){
 function abrirEliminar(idx, id){
   elimIdx=idx;
   elimId=id||'';
+  window._idsEliminar = []; // limpiar selección múltiple
   document.getElementById('confirmElim').classList.add('open');
 }
 
@@ -5013,6 +5037,188 @@ window.addEventListener('online', ()=>{
 // ══════════════════════════════════════════
 //  INIT
 // ══════════════════════════════════════════
+
+// ════════════════════════════════════════════════════
+//  SELECCIÓN MÚLTIPLE — Registros
+// ════════════════════════════════════════════════════
+function actualizarSelReg(){
+  var checks   = Array.from(document.querySelectorAll('.chk-reg'));
+  var marcados = checks.filter(function(c){ return c.checked; });
+  var btn = document.getElementById('btnEliminarSel');
+  var cnt = document.getElementById('cntSel');
+  var master = document.getElementById('chkTodos');
+  if(cnt) cnt.textContent = marcados.length;
+  if(btn) btn.style.display = marcados.length > 0 ? '' : 'none';
+  if(master){
+    master.checked       = marcados.length > 0 && marcados.length === checks.length;
+    master.indeterminate = marcados.length > 0 && marcados.length < checks.length;
+  }
+  // Resaltar filas seleccionadas
+  checks.forEach(function(c){
+    var fila = document.getElementById('regfila-' + c.value);
+    if(fila) fila.style.background = c.checked ? 'rgba(224,82,82,.08)' : '';
+  });
+}
+
+function toggleTodosSel(checked){
+  document.querySelectorAll('.chk-reg').forEach(function(c){ c.checked = checked; });
+  actualizarSelReg();
+}
+
+function confirmarEliminarSeleccion(){
+  var ids = Array.from(document.querySelectorAll('.chk-reg:checked')).map(function(c){ return c.value; });
+  if(!ids.length) return;
+  window._idsEliminar = ids;
+  document.getElementById('confirmElim').classList.add('open');
+  // Guardar referencia al texto del confirm
+  var msg = document.querySelector('#confirmElim p, #confirmElim .confirm-msg');
+  if(msg) msg.textContent = '¿Eliminar ' + ids.length + ' registro' + (ids.length!==1?'s':'') + ' seleccionado'+(ids.length!==1?'s':'')+'? Esta acción no se puede deshacer.';
+}
+
+// Override de confirmarEliminar para detectar si es selección múltiple
+var _origConfirmarEliminar = null;
+document.addEventListener('DOMContentLoaded', function(){
+  // Sobreescribir el botón de confirmar eliminación
+  var btnConf = document.querySelector('#confirmElim .btn-danger, #confirmElim [onclick*="confirmarEliminar"]');
+});
+
+async function ejecutarEliminarSeleccion(){
+  var ids = window._idsEliminar || [];
+  if(!ids.length) return;
+  cerrarConfirm();
+  showToast('⏳ Eliminando '+ids.length+' registros…','info',3000);
+  var ok = 0, errCount = 0;
+  var CHUNK = 50;
+  var db = window._sbClient || (typeof supabase !== 'undefined' ? supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null);
+  if(!db){ showToast('❌ Sin conexión a Supabase','error'); return; }
+  for(var i = 0; i < ids.length; i += CHUNK){
+    var lote = ids.slice(i, i + CHUNK);
+    var res  = await db.from('registros').delete().in('id', lote);
+    if(res.error){ errCount += lote.length; console.error(res.error.message); }
+    else ok += lote.length;
+  }
+  window._idsEliminar = [];
+  if(errCount === 0){
+    showToast('🗑 '+ok+' registros eliminados','success',4000);
+  } else {
+    showToast('⚠️ '+ok+' eliminados, '+errCount+' con error','warning',5000);
+  }
+  _registrosCargados = false;
+  cargarRegistros();
+}
+
+// ════════════════════════════════════════════════════
+//  EXPORTAR REGISTROS A EXCEL
+// ════════════════════════════════════════════════════
+async function exportarRegistrosExcel(){
+  if(typeof XLSX === 'undefined'){
+    showToast('❌ Librería Excel no cargada — recarga la página','error',5000); return;
+  }
+  // Obtener filtros activos
+  var desde  = document.getElementById('filtroDesde').value;
+  var hasta  = document.getElementById('filtroHasta').value;
+  var turno  = document.getElementById('filtroTurno').value;
+  var linea  = document.getElementById('filtroLinea').value;
+  var busq   = (document.getElementById('filtroTabla').value||'').trim();
+
+  showToast('⏳ Preparando Excel con todos los registros del filtro…','info',3000);
+
+  // Traer TODOS los registros del filtro actual desde Supabase (sin paginación)
+  var db = window._sbClient || null;
+  var data = [];
+
+  if(db){
+    var q = db.from('registros').select('*');
+    if(turno)  q = q.eq('turno', turno);
+    if(linea)  q = q.eq('linea', linea);
+    if(desde)  q = q.gte('fecha', desde);
+    if(hasta)  q = q.lte('fecha', hasta);
+    if(busq)   q = q.or('codigo.ilike.%'+busq+'%,nombre.ilike.%'+busq+'%,responsable.ilike.%'+busq+'%');
+    q = q.order('fecha',{ascending:false}).order('created_at',{ascending:false});
+    var res = await q;
+    if(res.error){ showToast('❌ Error: '+res.error.message,'error'); return; }
+    data = res.data || [];
+  } else {
+    // Fallback: usar los registros filtrados en pantalla (todosRegistros ya filtrado)
+    data = todosRegistros.map(function(r){
+      return {
+        mes:r[0],fecha:r[1],responsable:r[2],turno:r[3],linea:r[4],
+        codigo:r[5],nombre:r[6],tipo_contrato:r[7],funcion:r[8],centro_costo:r[9],
+        especie:r[10],producto:r[11],proceso:r[12],operacion:r[13],
+        proceso_inicio:r[14],proceso_termino:r[15],atraso_inicio:r[16],
+        descanso_inicio:r[17],descanso_termino:r[18],desayuno_programado:r[19],
+        colacion_inicio:r[20],colacion_termino:r[21],colacion_programado:r[22]
+      };
+    });
+  }
+
+  if(!data.length){ showToast('⚠️ Sin registros para exportar con los filtros actuales','warning'); return; }
+
+  // Columnas en el mismo orden que el formulario de registro
+  var COLS = [
+    {k:'mes',               label:'Mes'},
+    {k:'fecha',             label:'Fecha'},
+    {k:'responsable',       label:'Responsable'},
+    {k:'turno',             label:'Turno'},
+    {k:'linea',             label:'Línea'},
+    {k:'codigo',            label:'Código'},
+    {k:'nombre',            label:'Nombre'},
+    {k:'tipo_contrato',     label:'Tipo Contrato'},
+    {k:'funcion',           label:'Función'},
+    {k:'centro_costo',      label:'Centro de Costo'},
+    {k:'especie',           label:'Especie'},
+    {k:'producto',          label:'Producto'},
+    {k:'proceso',           label:'Proceso'},
+    {k:'operacion',         label:'Operación'},
+    {k:'proceso_inicio',    label:'Proceso Inicio'},
+    {k:'proceso_termino',   label:'Proceso Término'},
+    {k:'atraso_inicio',     label:'Atraso Inicio (min)'},
+    {k:'descanso_inicio',   label:'Descanso Inicio'},
+    {k:'descanso_termino',  label:'Descanso Término'},
+    {k:'desayuno_programado',label:'Desayuno Programado'},
+    {k:'colacion_inicio',   label:'Colación Inicio'},
+    {k:'colacion_termino',  label:'Colación Término'},
+    {k:'colacion_programado',label:'Colación Programado'},
+  ];
+
+  function limpiarVal(k, v){
+    if(v === null || v === undefined) return '';
+    var s = String(v);
+    // Timestamps → formato legible
+    if(/^\d{4}-\d{2}-\d{2}T/.test(s)) return s.replace('T',' ').substring(0,16);
+    return s;
+  }
+
+  var header = COLS.map(function(c){ return c.label; });
+  var filas  = data.map(function(r){
+    return COLS.map(function(c){ return limpiarVal(c.k, r[c.k]); });
+  });
+
+  var ws = XLSX.utils.aoa_to_sheet([header].concat(filas));
+
+  // Ancho de columnas automático
+  ws['!cols'] = COLS.map(function(c, ci){
+    var max = c.label.length;
+    filas.forEach(function(f){ var v=String(f[ci]||''); if(v.length>max) max=v.length; });
+    return { wch: Math.min(Math.max(max+2,10),38) };
+  });
+
+  // Primera fila congelada
+  ws['!freeze'] = {xSplit:0,ySplit:1,topLeftCell:'A2',activePane:'bottomLeft',state:'frozen'};
+
+  var wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Registros');
+
+  var sufijo = '';
+  if(desde && hasta) sufijo = '_'+desde+'_a_'+hasta;
+  else if(desde)     sufijo = '_desde_'+desde;
+  else if(hasta)     sufijo = '_hasta_'+hasta;
+  else               sufijo = '_'+new Date().toISOString().substring(0,10);
+
+  XLSX.writeFile(wb, 'registros'+sufijo+'.xlsx');
+  showToast('✅ '+data.length+' registros → registros'+sufijo+'.xlsx','success',5000);
+}
+
 window.onload=function(){
   // Aplicar tema guardado
   aplicarTema(temaActual);
