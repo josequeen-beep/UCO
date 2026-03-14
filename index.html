@@ -14,7 +14,20 @@
 
 // ── CONFIGURACIÓN — edita solo estas líneas ──────────────────────
 const SUPABASE_URL      = 'https://qvtztwqbbbzortkodtla.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF2dHp0d3FiYmJ6b3J0a29kdGxhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM0NDA4NTMsImV4cCI6MjA4OTAxNjg1M30.zMcRweclE46qwOCTduo7sLfduZxXjKvFLmim7nZyiok';
+const SUPABASE_ANON_KEY = 'REEMPLAZAR_CON_TU_ANON_KEY'; // ← PEGA AQUÍ TU ANON KEY
+
+// ── Auto-detección de configuración incompleta ──
+(function() {
+  if (SUPABASE_ANON_KEY === 'REEMPLAZAR_CON_TU_ANON_KEY' || !SUPABASE_URL.includes('.supabase.co')) {
+    document.addEventListener('DOMContentLoaded', function() {
+      var b = document.createElement('div');
+      b.id = 'cfg-banner';
+      b.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:#c0392b;color:#fff;padding:10px 20px;font-family:sans-serif;font-size:13px;font-weight:700;text-align:center;letter-spacing:.3px;';
+      b.innerHTML = '⚠️  FALTA CONFIGURAR: Abre el archivo index.html, busca <code style="background:rgba(255,255,255,.2);padding:2px 6px;border-radius:4px;">REEMPLAZAR_CON_TU_ANON_KEY</code> y reemplázala con tu Anon Key de Supabase';
+      document.body.insertBefore(b, document.body.firstChild);
+    });
+  }
+})();
 const SHEETS_API_VACACIONES = ''; // opcional
 const SHEETS_API_PERMISOS   = ''; // opcional
 // ────────────────────────────────────────────────────────────────
@@ -304,34 +317,53 @@ async function obtenerEstadisticas(){
 //  POLYFILL google.script.run
 //  Se instala INMEDIATAMENTE — antes de window.onload
 // ════════════════════════════════════════════════════════════════
-const _API = {
-  getListData, obtenerEmpleados, buscarEmpleados, buscarResponsables, obtenerResponsables,
-  guardarAsistencia, obtenerRegistrosSemana, obtenerRegistrosFiltrados,
-  editarRegistro, eliminarRegistro, obtenerAusentesDia,
-  invalidarCache, limpiarCache, obtenerEstadisticas,
+// ══ Registro de funciones disponibles ══
+var _API = {
+  getListData: getListData,
+  obtenerEmpleados: obtenerEmpleados,
+  buscarEmpleados: buscarEmpleados,
+  buscarResponsables: buscarResponsables,
+  obtenerResponsables: obtenerResponsables,
+  guardarAsistencia: guardarAsistencia,
+  obtenerRegistrosSemana: obtenerRegistrosSemana,
+  obtenerRegistrosFiltrados: obtenerRegistrosFiltrados,
+  editarRegistro: editarRegistro,
+  eliminarRegistro: eliminarRegistro,
+  obtenerAusentesDia: obtenerAusentesDia,
+  invalidarCache: invalidarCache,
+  limpiarCache: limpiarCache,
+  obtenerEstadisticas: obtenerEstadisticas,
 };
 
-window.google = { script: { run: new Proxy({}, {
-  get(_, name) {
-    let _S = ()=>{}, _F = e=>console.error('[API]',name,e);
-    const proxy = new Proxy({
-      withSuccessHandler(fn){ _S=fn; return proxy; },
-      withFailureHandler(fn){ _F=fn; return proxy; },
-    },{
-      get(t,p){
-        if(p in t) return t[p];
-        return function(...args){
-          const fn=_API[p];
-          if(!fn){ _F(new Error(`Función "${p}" no encontrada`)); return; }
-          Promise.resolve().then(()=>fn(...args)).then(r=>_S(r)).catch(e=>_F(e));
-        };
-      }
+// ══ POLYFILL google.script.run ══
+// Cada acceso a .run crea un runner nuevo con sus propios handlers
+// Soporta: google.script.run.withSuccessHandler(fn).withFailureHandler(fn).miFuncion(args)
+window.google = window.google || {};
+window.google.script = window.google.script || {};
+Object.defineProperty(window.google.script, 'run', {
+  get: function() {
+    var _ok  = function() {};
+    var _fail = function(e) { console.error('[API error]', e && e.message ? e.message : e); };
+    var runner = {
+      withSuccessHandler: function(fn) { if (typeof fn === 'function') _ok = fn; return runner; },
+      withFailureHandler: function(fn) { if (typeof fn === 'function') _fail = fn; return runner; },
+    };
+    // Agregar cada función de la API directamente en el runner
+    Object.keys(_API).forEach(function(nombre) {
+      runner[nombre] = function() {
+        var args = Array.prototype.slice.call(arguments);
+        Promise.resolve()
+          .then(function() { return _API[nombre].apply(null, args); })
+          .then(function(r) { _ok(r); })
+          .catch(function(e) { _fail(e); });
+      };
     });
-    return proxy;
-  }
-})}};
+    return runner;
+  },
+  configurable: true,
+});
 
-console.log('[Supabase Backend v3.1] Instalado correctamente — google.script.run listo');
+console.log('[Supabase v3.1] Listo. Funciones:', Object.keys(_API).join(', '));
 </script>
 <!-- ──────────────────────────────────────────────────── -->
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
