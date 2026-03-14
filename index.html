@@ -6,7 +6,333 @@
 <title>Registro de Asistencia</title>
 <!-- ── SUPABASE: reemplaza Google Apps Script backend ── -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="supabase-api.js"></script>
+<script>
+// ═══════════════════════════════════════════════════════════════════
+//  SUPABASE BACKEND v3.1 — embebido inline
+//  Instala google.script.run INMEDIATAMENTE al parsear el script
+// ═══════════════════════════════════════════════════════════════════
+
+// ── CONFIGURACIÓN — edita solo estas líneas ──────────────────────
+const SUPABASE_URL      = 'https://qvtztwqbbbzortkodtla.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF2dHp0d3FiYmJ6b3J0a29kdGxhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM0NDA4NTMsImV4cCI6MjA4OTAxNjg1M30.zMcRweclE46qwOCTduo7sLfduZxXjKvFLmim7nZyiok';
+const SHEETS_API_VACACIONES = ''; // opcional
+const SHEETS_API_PERMISOS   = ''; // opcional
+// ────────────────────────────────────────────────────────────────
+
+const _SB_CONFIG = { VERSION:'3.1', MAX_BUSQUEDA:20, CACHE_TTL:300, CACHE_EMP:600, CACHE_EXT:600 };
+
+// ── CACHÉ EN MEMORIA ─────────────────────────────────────────────
+const _mc = {};
+function _cGet(k){ const e=_mc[k]; if(!e) return null; if(Date.now()>e.x){delete _mc[k];return null;} return e.d; }
+function _cPut(k,d,t){ _mc[k]={d,x:Date.now()+(t||_SB_CONFIG.CACHE_TTL)*1000}; }
+function _cDel(k){ delete _mc[k]; }
+function _cDelPfx(p){ Object.keys(_mc).forEach(k=>{ if(k.startsWith(p)) delete _mc[k]; }); }
+
+// ── CLIENTE SUPABASE — inicialización lazy ──────────────────────
+let _sbClient = null;
+function _db() {
+  if (!_sbClient) {
+    if (typeof supabase === 'undefined') throw new Error('Supabase SDK no cargado aún');
+    _sbClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  }
+  return _sbClient;
+}
+
+// ── UTILS ────────────────────────────────────────────────────────
+const _MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+function _ok(data,msg){ return {success:true,mensaje:msg||'OK',data:data||null,ts:new Date().toISOString()}; }
+function _err(msg,cod){ console.error('[API]',cod,msg); return {success:false,mensaje:msg,codigo:cod||'ERR',ts:new Date().toISOString()}; }
+function _toISO(v){ if(!v||v==='No aplica') return null; try{ return new Date(v).toISOString(); }catch{ return null; } }
+function _fmtTs(v){
+  if(!v) return '';
+  try {
+    const d=new Date(v), pad=n=>String(n).padStart(2,'0');
+    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  } catch { return ''; }
+}
+function _isoSem(d){
+  const f=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));
+  const dia=f.getUTCDay()||7; f.setUTCDate(f.getUTCDate()+4-dia);
+  const y0=new Date(Date.UTC(f.getUTCFullYear(),0,1));
+  return [Math.ceil((((f-y0)/86400000)+1)/7),f.getUTCFullYear()];
+}
+function _row(r){
+  return [
+    r.mes||'',r.fecha||'',r.responsable||'',r.turno||'',r.linea||'',
+    r.codigo||'',r.nombre||'',r.tipo_contrato||'',r.funcion||'',r.centro_costo||'',
+    r.especie||'',r.producto||'',r.proceso||'',r.operacion||'',
+    _fmtTs(r.proceso_inicio),_fmtTs(r.proceso_termino),r.atraso_inicio||'0',
+    _fmtTs(r.descanso_inicio),_fmtTs(r.descanso_termino),r.desayuno_programado||'',
+    _fmtTs(r.colacion_inicio),_fmtTs(r.colacion_termino),r.colacion_programado||'',
+    r.created_at?_fmtTs(r.created_at):'',r.id||''
+  ];
+}
+
+// ── AUDIT ────────────────────────────────────────────────────────
+async function _audit(accion,detalle){
+  try{ await _db().from('audit_log').insert({accion,detalle:detalle||'',usuario:'operario',sesion:Math.random().toString(36).slice(2)}); }
+  catch(e){ console.warn('[AUDIT]',e.message); }
+}
+
+// ── LISTAS DE PRODUCCIÓN ─────────────────────────────────────────
+async function getListData(){
+  const cKey='ld_v'+_SB_CONFIG.VERSION, cached=_cGet(cKey);
+  if(cached) return cached;
+  const {data,error}=await _db().from('produccion')
+    .select('especie,funcion,producto,proceso,operacion,responsable,linea,linea_especial,funcion_especial')
+    .eq('activo',true);
+  if(error){ console.error('[LISTAS]',error.message); return {especies:[],lineas:[],responsables:[],mapaEspecie:{},mapaProducto:{},mapaLinea:{}}; }
+  const LESP=new Set(['EMPAQUE','MPRIMA','SERVICIOS','STAFF','SUBPRODUCTO']);
+  const uniq=a=>[...new Set(a.map(v=>String(v||'').trim()).filter(Boolean))].sort();
+  let esp=[],fun=[],pro=[],proc=[],oper=[],lin=[];
+  const respSet=new Set(), mE={},mP={},mL={};
+  (data||[]).forEach(r=>{
+    const e=r.especie||'',f=r.funcion||'',p=r.producto||'',pr=r.proceso||'',op=r.operacion||'',
+          rs=r.responsable||'',l=r.linea||'',le=(r.linea_especial||'').toUpperCase(),lf=r.funcion_especial||'';
+    if(e) esp.push(e); if(f) fun.push(f); if(p) pro.push(p);
+    if(pr) proc.push(pr); if(op) oper.push(op); if(rs) respSet.add(rs);
+    if(l && !LESP.has(l.toUpperCase())) lin.push(l);
+    if(e&&p){
+      if(!mE[e]) mE[e]={productos:[]};
+      if(!mE[e].productos.includes(p)) mE[e].productos.push(p);
+      const k=e+'||'+p;
+      if(!mP[k]) mP[k]={funciones:[],procesos:[],operaciones:[]};
+      if(f&&!mP[k].funciones.includes(f)) mP[k].funciones.push(f);
+      if(pr&&!mP[k].procesos.includes(pr)) mP[k].procesos.push(pr);
+      if(op&&!mP[k].operaciones.includes(op)) mP[k].operaciones.push(op);
+    }
+    if(le&&LESP.has(le)&&lf){
+      if(!mL[le]) mL[le]=[];
+      if(!mL[le].includes(lf)) mL[le].push(lf);
+      if(!lin.includes(le)) lin.push(le);
+    }
+  });
+  const result={especies:uniq(esp),funciones:uniq(fun),productos:uniq(pro),procesos:uniq(proc),
+    operaciones:uniq(oper),responsables:[...uniq([...respSet])],lineas:uniq(lin),
+    mapaEspecie:mE,mapaProducto:mP,mapaLinea:mL,version:_SB_CONFIG.VERSION};
+  _cPut(cKey,result,_SB_CONFIG.CACHE_TTL);
+  return result;
+}
+
+// ── EMPLEADOS ────────────────────────────────────────────────────
+async function obtenerEmpleados(){
+  const cKey='emp_v'+_SB_CONFIG.VERSION, cached=_cGet(cKey);
+  if(cached) return cached;
+  const {data,error}=await _db().from('empleados').select('codigo,nombre,centro_costo,contrato').eq('activo',true).order('nombre');
+  if(error){ console.error('[EMP]',error.message); return []; }
+  const result=(data||[]).map(r=>({codigo:r.codigo,nombre:r.nombre,centroCosto:r.centro_costo,contrato:r.contrato}));
+  _cPut(cKey,result,_SB_CONFIG.CACHE_EMP);
+  return result;
+}
+async function buscarEmpleados(q){
+  if(!q||!q.trim()) return [];
+  const ql=q.toLowerCase().trim(), todos=await obtenerEmpleados(), found=[];
+  for(const e of todos){
+    if(e.codigo.toLowerCase().includes(ql)||e.nombre.toLowerCase().includes(ql)){ found.push(e); if(found.length>=_SB_CONFIG.MAX_BUSQUEDA) break; }
+  }
+  return found;
+}
+async function obtenerResponsables(){ return (await getListData()).responsables||[]; }
+async function buscarResponsables(q){
+  if(!q||!q.trim()) return [];
+  const ql=q.toLowerCase();
+  return ((await getListData()).responsables||[]).filter(r=>r.toLowerCase().includes(ql)).slice(0,15);
+}
+
+// ── CREATE ───────────────────────────────────────────────────────
+async function guardarAsistencia(data){
+  try{
+    if(!data.fecha)  return _err('Fecha requerida','VAL_FECHA');
+    if(!data.codigo) return _err('Empleado requerido','VAL_EMP');
+    if(!data.turno)  return _err('Turno requerido','VAL_TURNO');
+    if(!data.linea)  return _err('Línea requerida','VAL_LINEA');
+    const mes=_MESES[new Date(data.fecha+'T12:00:00').getMonth()];
+    const {data:ins,error}=await _db().from('registros').insert({
+      mes,fecha:data.fecha,responsable:data.responsable||'',turno:data.turno,linea:data.linea,
+      codigo:data.codigo,nombre:data.nombre||'',tipo_contrato:data.tipoContrato||'',
+      funcion:data.funcion||'',centro_costo:data.centroCosto||'',
+      especie:data.especie||'',producto:data.producto||'',proceso:data.proceso||'',operacion:data.operacion||'',
+      proceso_inicio:_toISO(data.procesoInicio),proceso_termino:_toISO(data.procesoTermino),
+      atraso_inicio:String(data.atrasoInicio||'0'),
+      descanso_inicio:_toISO(data.descansoInicio),descanso_termino:_toISO(data.descansoTermino),
+      desayuno_programado:data.desayunoProgramado||'',
+      colacion_inicio:_toISO(data.colacionInicio),colacion_termino:_toISO(data.colacionTermino),
+      colacion_programado:data.colacionProgramado||'',
+    }).select('id').single();
+    if(error) return _err('Error al guardar: '+error.message,'ERR_CREATE');
+    const [s,a]=_isoSem(new Date(data.fecha+'T12:00:00')); _cDel('sem_'+s+'_'+a);
+    await _audit('CREATE',`${data.codigo} ${data.nombre} | ${data.fecha} | ${data.turno} | ${data.linea}`);
+    return _ok({id:ins.id},'✅ Registro guardado correctamente.');
+  }catch(e){ return _err('Error al guardar: '+e.message,'ERR_CREATE'); }
+}
+
+// ── READ — Semana (Dashboard) ────────────────────────────────────
+async function obtenerRegistrosSemana(semana,anio){
+  try{
+    semana=parseInt(semana)||_isoSem(new Date())[0];
+    anio=parseInt(anio)||new Date().getFullYear();
+    const cKey='sem_'+semana+'_'+anio, cached=_cGet(cKey);
+    if(cached) return cached;
+    const jan4=new Date(Date.UTC(anio,0,4)),day4=jan4.getUTCDay()||7;
+    const lun=new Date(jan4); lun.setUTCDate(jan4.getUTCDate()-day4+1+(semana-1)*7);
+    const dom=new Date(lun); dom.setUTCDate(lun.getUTCDate()+6);
+    const desde=lun.toISOString().slice(0,10), hasta=dom.toISOString().slice(0,10);
+    const {data,error}=await _db().from('registros').select('*').gte('fecha',desde).lte('fecha',hasta)
+      .order('fecha',{ascending:false}).order('created_at',{ascending:false});
+    if(error){ console.error('[SEM]',error.message); return []; }
+    const result=(data||[]).map(_row);
+    _cPut(cKey,result,120);
+    return result;
+  }catch(e){ console.error('[SEM]',e.message); return []; }
+}
+
+// ── READ — Filtrado con paginación (Vista Registros) ─────────────
+async function obtenerRegistrosFiltrados(filtros,pagina,porPagina){
+  try{
+    pagina=Math.max(1,parseInt(pagina)||1);
+    porPagina=Math.min(2000,parseInt(porPagina)||50);
+    filtros=filtros||{};
+    let q=_db().from('registros').select('*',{count:'exact'});
+    if(filtros.desde) q=q.gte('fecha',filtros.desde);
+    if(filtros.hasta) q=q.lte('fecha',filtros.hasta);
+    if(filtros.turno) q=q.ilike('turno','%'+filtros.turno+'%');
+    if(filtros.linea) q=q.ilike('linea','%'+filtros.linea+'%');
+    if(filtros.busq){const b=filtros.busq; q=q.or(`codigo.ilike.%${b}%,nombre.ilike.%${b}%,responsable.ilike.%${b}%`);}
+    const ini=(pagina-1)*porPagina;
+    q=q.order('fecha',{ascending:false}).order('created_at',{ascending:false}).range(ini,ini+porPagina-1);
+    const {data,error,count}=await q;
+    if(error) return _err('Error filtrado: '+error.message,'ERR_FILTRADO');
+    return _ok({registros:(data||[]).map(_row),total:count||0,pagina,porPagina,totalPaginas:Math.ceil((count||0)/porPagina)});
+  }catch(e){ return _err('Error filtrado: '+e.message,'ERR_FILTRADO'); }
+}
+
+// ── UPDATE ───────────────────────────────────────────────────────
+async function editarRegistro(id,rowData){
+  try{
+    if(!id) return _err('ID requerido','VAL_IDX');
+    if(!Array.isArray(rowData)||!rowData.length) return _err('Datos requeridos','VAL_DATA');
+    const fechaStr=rowData[1]||'';
+    const mes=fechaStr?_MESES[new Date(fechaStr+'T12:00:00').getMonth()]:rowData[0];
+    const {error}=await _db().from('registros').update({
+      mes,fecha:fechaStr,responsable:rowData[2]||'',turno:rowData[3]||'',linea:rowData[4]||'',
+      codigo:rowData[5]||'',nombre:rowData[6]||'',tipo_contrato:rowData[7]||'',funcion:rowData[8]||'',
+      centro_costo:rowData[9]||'',especie:rowData[10]||'',producto:rowData[11]||'',
+      proceso:rowData[12]||'',operacion:rowData[13]||'',
+      proceso_inicio:_toISO(rowData[14]),proceso_termino:_toISO(rowData[15]),
+      atraso_inicio:String(rowData[16]||'0'),
+      descanso_inicio:_toISO(rowData[17]),descanso_termino:_toISO(rowData[18]),
+      desayuno_programado:rowData[19]||'',
+      colacion_inicio:_toISO(rowData[20]),colacion_termino:_toISO(rowData[21]),
+      colacion_programado:rowData[22]||'',
+    }).eq('id',id);
+    if(error) return _err('Error al actualizar: '+error.message,'ERR_UPDATE');
+    if(fechaStr){const [s,a]=_isoSem(new Date(fechaStr+'T12:00:00')); _cDel('sem_'+s+'_'+a);}
+    await _audit('UPDATE',`id ${id} | ${rowData[5]} ${rowData[6]} | ${fechaStr}`);
+    return _ok({id},'✅ Registro actualizado correctamente.');
+  }catch(e){ return _err('Error al actualizar: '+e.message,'ERR_UPDATE'); }
+}
+
+// ── DELETE ───────────────────────────────────────────────────────
+async function eliminarRegistro(id){
+  try{
+    if(!id) return _err('ID requerido','VAL_IDX');
+    const {data:antes}=await _db().from('registros').select('codigo,nombre,fecha,turno').eq('id',id).single();
+    const {error}=await _db().from('registros').delete().eq('id',id);
+    if(error) return _err('Error al eliminar: '+error.message,'ERR_DELETE');
+    if(antes?.fecha){const [s,a]=_isoSem(new Date(antes.fecha+'T12:00:00')); _cDel('sem_'+s+'_'+a);}
+    await _audit('DELETE',`id ${id} | ${antes?.codigo} ${antes?.nombre} | ${antes?.fecha}`);
+    return _ok(null,'✅ Registro eliminado correctamente.');
+  }catch(e){ return _err('Error al eliminar: '+e.message,'ERR_DELETE'); }
+}
+
+// ── AUSENTES DEL DÍA ────────────────────────────────────────────
+async function obtenerAusentesDia(fechaStr){
+  try{
+    if(!fechaStr){ const h=new Date(); fechaStr=`${h.getFullYear()}-${String(h.getMonth()+1).padStart(2,'0')}-${String(h.getDate()).padStart(2,'0')}`; }
+    const {data:noRegData}=await _db().from('noregistrar').select('codigo,nombre');
+    const nrC=new Set((noRegData||[]).map(r=>r.codigo.trim().toLowerCase()).filter(Boolean));
+    const nrN=new Set((noRegData||[]).map(r=>r.nombre.trim().toLowerCase()).filter(Boolean));
+    const empleados=(await obtenerEmpleados()).filter(e=>!nrC.has(e.codigo.toLowerCase())&&!nrN.has(e.nombre.toLowerCase()));
+    const {data:regsHoy}=await _db().from('registros').select('codigo').eq('fecha',fechaStr);
+    const conReg=new Set((regsHoy||[]).map(r=>r.codigo));
+    const ausentes=empleados.filter(e=>!conReg.has(e.codigo));
+    if(!ausentes.length) return [];
+    // Vacaciones y permisos externos (opcionales)
+    let vacSet=new Set(), permP=new Set(), permM=new Set(), permJ=new Set();
+    if(SHEETS_API_VACACIONES){
+      try{ const vCached=_cGet('ext_vac'); if(vCached){ vacSet=new Set(vCached); }
+        else{ const r=await fetch(SHEETS_API_VACACIONES); if(r.ok){ const j=await r.json(); vacSet=new Set(j.codigosEnCurso||[]); _cPut('ext_vac',[...vacSet],_SB_CONFIG.CACHE_EXT); } }
+      }catch(e){ console.warn('[VAC]',e.message); }
+    }
+    if(SHEETS_API_PERMISOS){
+      try{ const pCached=_cGet('ext_perm_'+fechaStr);
+        if(pCached){ permP=new Set(pCached.personal||[]); permM=new Set(pCached.medico||[]); permJ=new Set(pCached.judicial||[]); }
+        else{ const r=await fetch(SHEETS_API_PERMISOS+'&fecha='+fechaStr);
+          if(r.ok){ const j=await r.json(); permP=new Set(j.personal||[]); permM=new Set(j.medico||[]); permJ=new Set(j.judicial||[]);
+            _cPut('ext_perm_'+fechaStr,{personal:[...permP],medico:[...permM],judicial:[...permJ]},_SB_CONFIG.CACHE_EXT); } }
+      }catch(e){ console.warn('[PERM]',e.message); }
+    }
+    const ord={'Sin registro':0,'Permiso Personal':1,'Permiso Médico':2,'Permiso Judicial':3,'Vacaciones en curso':4};
+    return ausentes.map(e=>{
+      let estado='Sin registro';
+      if(vacSet.has(e.codigo)) estado='Vacaciones en curso';
+      else if(permJ.has(e.codigo)) estado='Permiso Judicial';
+      else if(permM.has(e.codigo)) estado='Permiso Médico';
+      else if(permP.has(e.codigo)) estado='Permiso Personal';
+      return{...e,estado};
+    }).sort((a,b)=>{ const oa=ord[a.estado]??9,ob=ord[b.estado]??9; if(oa!==ob) return oa-ob; return a.nombre.localeCompare(b.nombre,'es'); });
+  }catch(e){ console.error('[AUSENTES]',e.message); return []; }
+}
+
+// ── CACHÉ ───────────────────────────────────────────────────────
+function invalidarCache(){ _cDelPfx('ld_v'); _cDelPfx('emp_v'); _cDel('ext_vac'); _cDelPfx('ext_perm_'); _cDelPfx('sem_'); }
+function limpiarCache(){ invalidarCache(); return _ok(null,'✅ Caché limpiado.'); }
+
+// ── ESTADÍSTICAS ─────────────────────────────────────────────────
+async function obtenerEstadisticas(){
+  try{
+    const [{count:r},{count:e},{count:a}]=await Promise.all([
+      _db().from('registros').select('*',{count:'exact',head:true}),
+      _db().from('empleados').select('*',{count:'exact',head:true}).eq('activo',true),
+      _db().from('audit_log').select('*',{count:'exact',head:true}),
+    ]);
+    return _ok({totalRegistros:r||0,totalEmpleados:e||0,totalAcciones:a||0,version:_SB_CONFIG.VERSION});
+  }catch(e){ return _err('Error: '+e.message,'ERR_STATS'); }
+}
+
+// ════════════════════════════════════════════════════════════════
+//  POLYFILL google.script.run
+//  Se instala INMEDIATAMENTE — antes de window.onload
+// ════════════════════════════════════════════════════════════════
+const _API = {
+  getListData, obtenerEmpleados, buscarEmpleados, buscarResponsables, obtenerResponsables,
+  guardarAsistencia, obtenerRegistrosSemana, obtenerRegistrosFiltrados,
+  editarRegistro, eliminarRegistro, obtenerAusentesDia,
+  invalidarCache, limpiarCache, obtenerEstadisticas,
+};
+
+window.google = { script: { run: new Proxy({}, {
+  get(_, name) {
+    let _S = ()=>{}, _F = e=>console.error('[API]',name,e);
+    const proxy = new Proxy({
+      withSuccessHandler(fn){ _S=fn; return proxy; },
+      withFailureHandler(fn){ _F=fn; return proxy; },
+    },{
+      get(t,p){
+        if(p in t) return t[p];
+        return function(...args){
+          const fn=_API[p];
+          if(!fn){ _F(new Error(`Función "${p}" no encontrada`)); return; }
+          Promise.resolve().then(()=>fn(...args)).then(r=>_S(r)).catch(e=>_F(e));
+        };
+      }
+    });
+    return proxy;
+  }
+})}};
+
+console.log('[Supabase Backend v3.1] Instalado correctamente — google.script.run listo');
+</script>
 <!-- ──────────────────────────────────────────────────── -->
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -3319,7 +3645,7 @@ function renderTabla(rows){
 
   tbody.innerHTML=rows.map((r,i)=>{
     const realIdx=todosRegistros.indexOf(r);
-    const rowId=String(r[24]||'');  // UUID desde supabase-api.js
+    const rowId=String(r[24]||'');  // UUID desde Supabase
     const tc=(r[3]||'').toLowerCase().includes('noche')?'noche':'dia';
     const {dup, porCodigo, porNombre} = esDuplicado(r);
     const trClass = dup ? ' class="row-duplicado"' : '';
