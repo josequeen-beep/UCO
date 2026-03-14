@@ -1,0 +1,1864 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin — Sistema de Asistencia</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<style>
+/* ══ VARIABLES ══ */
+:root {
+  --bg:       #07090f;
+  --surface:  #0d1117;
+  --surface2: #131b24;
+  --surface3: #1a2535;
+  --border:   #1e2d3d;
+  --border2:  #2a3f55;
+  --text:     #e2eaf4;
+  --muted:    #5a7a96;
+  --hint:     #3a5068;
+  --accent:   #00d4aa;
+  --accent2:  #0094d4;
+  --danger:   #e05252;
+  --warn:     #e09a20;
+  --success:  #3ecf8e;
+  --mono:     'JetBrains Mono', monospace;
+  --sans:     'Syne', sans-serif;
+}
+
+*,*::before,*::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: var(--sans);
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ══ TOPBAR ══ */
+.topbar {
+  display: flex; align-items: center; gap: 16px;
+  padding: 0 24px;
+  height: 56px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  position: sticky; top: 0; z-index: 100;
+}
+.topbar-logo {
+  font-family: var(--mono);
+  font-size: 13px; font-weight: 700;
+  color: var(--accent);
+  letter-spacing: -.3px;
+  display: flex; align-items: center; gap: 8px;
+}
+.topbar-logo::before {
+  content: '';
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: pulse 2s ease-in-out infinite;
+}
+@keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.5;transform:scale(.8)} }
+
+.topbar-sep { width: 1px; height: 20px; background: var(--border); }
+.topbar-title { font-size: 14px; font-weight: 600; color: var(--muted); }
+
+.topbar-nav { display: flex; gap: 2px; margin-left: auto; }
+.tnav-btn {
+  padding: 6px 14px;
+  border-radius: 6px;
+  font-family: var(--sans);
+  font-size: 12px; font-weight: 600;
+  color: var(--muted);
+  background: none; border: none;
+  cursor: pointer; transition: all .15s;
+}
+.tnav-btn:hover { background: var(--surface2); color: var(--text); }
+.tnav-btn.active { background: rgba(0,212,170,.12); color: var(--accent); }
+
+.conn-badge {
+  display: flex; align-items: center; gap: 6px;
+  font-family: var(--mono);
+  font-size: 10px; font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 20px;
+  background: rgba(94,94,94,.15);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  transition: all .3s;
+}
+.conn-badge.ok  { background: rgba(62,207,142,.1);  border-color: rgba(62,207,142,.3);  color: var(--success); }
+.conn-badge.err { background: rgba(224,82,82,.1);   border-color: rgba(224,82,82,.3);   color: var(--danger); }
+.conn-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+
+/* ══ LAYOUT ══ */
+.app-body {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* ══ SIDEBAR ══ */
+.sidebar {
+  width: 220px; flex-shrink: 0;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  overflow-y: auto;
+  display: flex; flex-direction: column;
+}
+.sidebar-section { padding: 16px 12px 8px; }
+.sidebar-label {
+  font-family: var(--mono);
+  font-size: 9px; font-weight: 700;
+  color: var(--hint);
+  letter-spacing: 1.5px; text-transform: uppercase;
+  padding: 0 8px; margin-bottom: 6px;
+}
+.sidebar-item {
+  display: flex; align-items: center; gap: 9px;
+  padding: 8px 10px;
+  border-radius: 7px;
+  font-size: 13px; font-weight: 600;
+  color: var(--muted);
+  cursor: pointer; transition: all .12s;
+  border: none; background: none; width: 100%; text-align: left;
+}
+.sidebar-item:hover { background: var(--surface2); color: var(--text); }
+.sidebar-item.active { background: rgba(0,212,170,.1); color: var(--accent); }
+.sidebar-item .si-icon { font-size: 15px; width: 20px; text-align: center; }
+.sidebar-item .si-count {
+  margin-left: auto;
+  font-family: var(--mono);
+  font-size: 10px; font-weight: 700;
+  background: var(--surface3);
+  padding: 1px 7px; border-radius: 20px;
+  color: var(--muted);
+}
+.sidebar-item.active .si-count { background: rgba(0,212,170,.15); color: var(--accent); }
+
+/* ══ MAIN PANEL ══ */
+.main-panel {
+  flex: 1;
+  overflow: auto;
+  display: flex; flex-direction: column;
+}
+
+/* ══ PAGES ══ */
+.page { display: none; flex: 1; }
+.page.active { display: flex; flex-direction: column; }
+
+/* ══ PAGE HEADER ══ */
+.page-header {
+  display: flex; align-items: center; gap: 14px;
+  padding: 20px 28px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  flex-shrink: 0;
+}
+.page-header h1 { font-size: 20px; font-weight: 800; letter-spacing: -.3px; }
+.page-header p { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.page-header-actions { margin-left: auto; display: flex; gap: 8px; }
+
+/* ══ BUTTONS ══ */
+.btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 16px; border-radius: 7px;
+  font-family: var(--sans); font-size: 13px; font-weight: 700;
+  cursor: pointer; transition: all .15s; border: none;
+}
+.btn-primary { background: var(--accent); color: #000; }
+.btn-primary:hover { opacity: .88; transform: translateY(-1px); }
+.btn-secondary { background: var(--surface2); border: 1px solid var(--border2); color: var(--text); }
+.btn-secondary:hover { background: var(--surface3); }
+.btn-danger { background: rgba(224,82,82,.15); border: 1px solid rgba(224,82,82,.3); color: var(--danger); }
+.btn-danger:hover { background: var(--danger); color: #fff; }
+.btn-warn { background: rgba(224,154,32,.15); border: 1px solid rgba(224,154,32,.3); color: var(--warn); }
+.btn-warn:hover { background: var(--warn); color: #000; }
+.btn-sm { padding: 5px 10px; font-size: 11px; border-radius: 5px; }
+.btn:disabled { opacity: .4; cursor: default; transform: none !important; }
+
+/* ══ TABLE AREA ══ */
+.table-area { padding: 20px 28px; flex: 1; }
+
+.toolbar {
+  display: flex; align-items: center; gap: 10px;
+  margin-bottom: 16px; flex-wrap: wrap;
+}
+.search-input {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 8px 12px;
+  font-family: var(--sans); font-size: 13px;
+  color: var(--text); min-width: 240px;
+  transition: border-color .2s;
+}
+.search-input:focus { outline: none; border-color: var(--accent); }
+.search-input::placeholder { color: var(--hint); }
+
+.filter-select {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 8px 10px;
+  font-family: var(--sans); font-size: 12px;
+  color: var(--text); cursor: pointer;
+}
+.filter-select:focus { outline: none; border-color: var(--accent2); }
+
+.count-badge {
+  font-family: var(--mono);
+  font-size: 11px; font-weight: 700;
+  background: var(--surface3);
+  border: 1px solid var(--border);
+  padding: 4px 10px; border-radius: 20px;
+  color: var(--muted);
+  margin-left: auto;
+}
+
+/* ══ DATA TABLE ══ */
+.data-table-wrap {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.data-table {
+  width: 100%; border-collapse: collapse;
+  font-size: 12px;
+}
+.data-table thead tr {
+  background: var(--surface2);
+  border-bottom: 1px solid var(--border);
+}
+.data-table th {
+  padding: 10px 14px; text-align: left;
+  font-size: 10px; font-weight: 700;
+  color: var(--muted);
+  letter-spacing: .8px; text-transform: uppercase;
+  white-space: nowrap; cursor: pointer;
+  user-select: none; font-family: var(--mono);
+  transition: color .15s;
+}
+.data-table th:hover { color: var(--text); }
+.data-table td {
+  padding: 9px 14px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+  max-width: 200px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.data-table tr:last-child td { border-bottom: none; }
+.data-table tbody tr:hover td { background: rgba(0,212,170,.03); }
+
+.td-actions { display: flex; gap: 5px; white-space: nowrap; }
+
+/* ══ EMPTY STATE ══ */
+.empty-state {
+  display: flex; flex-direction: column; align-items: center;
+  justify-content: center; padding: 60px 20px;
+  color: var(--muted); gap: 10px;
+}
+.empty-state .ei { font-size: 36px; }
+.empty-state p { font-size: 14px; }
+
+/* ══ LOADING ══ */
+.loading-row td {
+  padding: 40px !important;
+  text-align: center;
+  color: var(--muted);
+}
+.spinner {
+  display: inline-block;
+  width: 16px; height: 16px;
+  border: 2px solid var(--border2);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin .6s linear infinite;
+  vertical-align: middle; margin-right: 6px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ══ MODAL ══ */
+.modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,.65);
+  backdrop-filter: blur(4px);
+  z-index: 500;
+  display: none; align-items: center; justify-content: center;
+  padding: 20px;
+}
+.modal-overlay.open { display: flex; animation: fadeIn .2s ease; }
+@keyframes fadeIn { from{opacity:0} to{opacity:1} }
+
+.modal {
+  background: var(--surface);
+  border: 1px solid var(--border2);
+  border-radius: 14px;
+  width: 100%; max-width: 600px;
+  max-height: 90vh; overflow-y: auto;
+  box-shadow: 0 24px 60px rgba(0,0,0,.5);
+  animation: slideUp .25s cubic-bezier(.4,0,.2,1);
+}
+@keyframes slideUp { from{transform:translateY(20px);opacity:0} to{transform:translateY(0);opacity:1} }
+
+.modal-header {
+  display: flex; align-items: center; gap: 12px;
+  padding: 18px 22px;
+  border-bottom: 1px solid var(--border);
+}
+.modal-header h2 { font-size: 16px; font-weight: 800; flex: 1; }
+.modal-close {
+  background: var(--surface2); border: 1px solid var(--border);
+  color: var(--muted); border-radius: 6px;
+  width: 28px; height: 28px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; font-size: 14px; transition: all .15s;
+}
+.modal-close:hover { background: var(--surface3); color: var(--text); }
+
+.modal-body { padding: 22px; }
+
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.form-grid.cols1 { grid-template-columns: 1fr; }
+
+.form-field { display: flex; flex-direction: column; gap: 5px; }
+.form-field.full { grid-column: 1/-1; }
+.form-label {
+  font-size: 10px; font-weight: 700;
+  color: var(--muted); letter-spacing: .7px;
+  text-transform: uppercase; font-family: var(--mono);
+}
+.form-input, .form-select {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 9px 11px;
+  font-family: var(--sans); font-size: 13px;
+  color: var(--text); transition: border-color .2s;
+  width: 100%;
+}
+.form-input:focus, .form-select:focus {
+  outline: none; border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(0,212,170,.08);
+}
+.form-input::placeholder { color: var(--hint); }
+
+.modal-footer {
+  display: flex; gap: 10px; justify-content: flex-end;
+  padding: 16px 22px;
+  border-top: 1px solid var(--border);
+}
+
+/* ══ CONFIRM DIALOG ══ */
+.confirm-box {
+  background: var(--surface);
+  border: 1px solid rgba(224,82,82,.3);
+  border-radius: 12px;
+  padding: 28px; max-width: 380px; width: 90%;
+  text-align: center;
+}
+.confirm-box h3 { font-size: 16px; font-weight: 800; margin-bottom: 8px; }
+.confirm-box p { font-size: 13px; color: var(--muted); margin-bottom: 20px; line-height: 1.6; }
+.confirm-btns { display: flex; gap: 10px; justify-content: center; }
+
+/* ══ TOAST ══ */
+#toast {
+  position: fixed; bottom: 28px; left: 50%;
+  transform: translateX(-50%) translateY(80px);
+  padding: 12px 22px; border-radius: 22px;
+  font-weight: 700; font-size: 13px; color: #fff;
+  z-index: 9999; transition: transform .4s cubic-bezier(.34,1.56,.64,1), opacity .4s;
+  opacity: 0; pointer-events: none; white-space: nowrap;
+  backdrop-filter: blur(16px);
+}
+#toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+#toast.success { background: rgba(62,207,142,.95); color: #000; }
+#toast.error   { background: rgba(224,82,82,.95); }
+#toast.info    { background: rgba(0,148,212,.95); }
+#toast.warn    { background: rgba(224,154,32,.95); color: #000; }
+
+/* ══ SETTINGS PAGE ══ */
+.settings-wrap { padding: 24px 28px; max-width: 800px; }
+.settings-section {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  margin-bottom: 20px;
+}
+.settings-section-title {
+  display: flex; align-items: center; gap: 10px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px; font-weight: 700;
+  background: var(--surface2);
+}
+.settings-section-title .sticon { font-size: 16px; }
+.settings-row {
+  display: flex; align-items: center;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border);
+  gap: 14px;
+}
+.settings-row:last-child { border-bottom: none; }
+.settings-row-info { flex: 1; }
+.settings-row-label { font-size: 13px; font-weight: 600; color: var(--text); }
+.settings-row-desc  { font-size: 11px; color: var(--muted); margin-top: 2px; }
+.settings-input {
+  background: var(--surface3);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 8px 12px;
+  font-family: var(--mono); font-size: 12px;
+  color: var(--text); min-width: 300px;
+  transition: border-color .2s;
+}
+.settings-input:focus { outline: none; border-color: var(--accent); }
+.settings-input.saved { border-color: rgba(62,207,142,.5); }
+
+/* ══ IMPORT / EXPORT ══ */
+.import-zone {
+  border: 2px dashed var(--border2);
+  border-radius: 10px;
+  padding: 32px 24px; text-align: center;
+  transition: all .2s; cursor: pointer; margin: 14px 0;
+}
+.import-zone:hover, .import-zone.drag {
+  border-color: var(--accent);
+  background: rgba(0,212,170,.04);
+}
+.import-zone-icon { font-size: 32px; margin-bottom: 8px; }
+.import-zone-title { font-size: 14px; font-weight: 700; color: var(--text); margin-bottom: 4px; }
+.import-zone-sub { font-size: 12px; color: var(--muted); }
+#fileInput { display: none; }
+
+/* ══ STATS CARDS ══ */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 14px;
+  padding: 20px 28px 0;
+}
+.stat-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 18px;
+  transition: border-color .2s;
+}
+.stat-card:hover { border-color: var(--border2); }
+.stat-val {
+  font-family: var(--mono);
+  font-size: 28px; font-weight: 700;
+  color: var(--accent);
+  line-height: 1;
+  margin-bottom: 4px;
+}
+.stat-label {
+  font-size: 11px; font-weight: 700;
+  color: var(--muted);
+  letter-spacing: .5px; text-transform: uppercase;
+}
+
+/* ══ PAGINATION ══ */
+.pagination {
+  display: flex; align-items: center; gap: 6px;
+  padding: 14px 0; justify-content: center; flex-shrink: 0;
+}
+.page-btn {
+  width: 32px; height: 32px; border-radius: 6px;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--mono); font-size: 12px; font-weight: 700;
+  cursor: pointer; transition: all .12s; border: none;
+  background: var(--surface2); color: var(--muted);
+  border: 1px solid var(--border);
+}
+.page-btn:hover { background: var(--surface3); color: var(--text); }
+.page-btn.active { background: var(--accent); color: #000; border-color: var(--accent); }
+.page-btn:disabled { opacity: .35; cursor: default; }
+
+/* ══ BADGE ══ */
+.badge {
+  display: inline-flex; align-items: center;
+  padding: 2px 8px; border-radius: 20px;
+  font-size: 10px; font-weight: 700;
+  font-family: var(--mono);
+}
+.badge-dia    { background: rgba(255,213,80,.12); color: #d4a800; border: 1px solid rgba(255,213,80,.25); }
+.badge-noche  { background: rgba(56,189,248,.12);  color: #38bdf8; border: 1px solid rgba(56,189,248,.25); }
+.badge-active { background: rgba(62,207,142,.12); color: var(--success); border: 1px solid rgba(62,207,142,.25); }
+
+@media (max-width: 768px) {
+  .sidebar { display: none; }
+  .form-grid { grid-template-columns: 1fr; }
+  .settings-input { min-width: unset; width: 100%; }
+}
+</style>
+</head>
+<body>
+
+<!-- ══ TOPBAR ══ -->
+<div class="topbar">
+  <div class="topbar-logo">ADMIN PANEL</div>
+  <div class="topbar-sep"></div>
+  <div class="topbar-title">Sistema de Asistencia · Friosur</div>
+  <div class="conn-badge" id="connBadge">
+    <div class="conn-dot"></div>
+    <span id="connText">Conectando…</span>
+  </div>
+</div>
+
+<!-- ══ BODY ══ -->
+<div class="app-body">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="sidebar-section">
+      <div class="sidebar-label">Base de datos</div>
+      <button class="sidebar-item active" onclick="goPage('registros')">
+        <span class="si-icon">📝</span> Registros
+        <span class="si-count" id="cnt-registros">—</span>
+      </button>
+      <button class="sidebar-item" onclick="goPage('empleados')">
+        <span class="si-icon">👥</span> Empleados
+        <span class="si-count" id="cnt-empleados">—</span>
+      </button>
+      <button class="sidebar-item" onclick="goPage('produccion')">
+        <span class="si-icon">🏭</span> Producción
+        <span class="si-count" id="cnt-produccion">—</span>
+      </button>
+      <button class="sidebar-item" onclick="goPage('noregistrar')">
+        <span class="si-icon">🚫</span> No registrar
+        <span class="si-count" id="cnt-noregistrar">—</span>
+      </button>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-label">Sistema</div>
+      <button class="sidebar-item" onclick="goPage('importar')">
+        <span class="si-icon">📥</span> Importar datos
+      </button>
+      <button class="sidebar-item" onclick="goPage('exportar')">
+        <span class="si-icon">📤</span> Exportar datos
+      </button>
+      <button class="sidebar-item" onclick="goPage('auditlog')">
+        <span class="si-icon">🔍</span> Log auditoría
+        <span class="si-count" id="cnt-auditlog">—</span>
+      </button>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-label">Config</div>
+      <button class="sidebar-item" onclick="goPage('settings')">
+        <span class="si-icon">⚙️</span> Configuración
+      </button>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <div class="main-panel">
+
+    <!-- ══ PÁGINA: REGISTROS ══ -->
+    <div class="page active" id="page-registros">
+      <div class="page-header">
+        <div>
+          <h1>Registros de Asistencia</h1>
+          <p>Ver, editar y eliminar registros. Los cambios se guardan en Supabase.</p>
+        </div>
+        <div class="page-header-actions">
+          <button class="btn btn-secondary" onclick="loadRegistros()">🔄 Recargar</button>
+          <button class="btn btn-primary" onclick="abrirModalRegistro()">＋ Nuevo registro</button>
+        </div>
+      </div>
+
+      <!-- Stats rápidas -->
+      <div class="stats-grid" id="statsReg">
+        <div class="stat-card"><div class="stat-val" id="sr-total">—</div><div class="stat-label">Total</div></div>
+        <div class="stat-card"><div class="stat-val" id="sr-dia">—</div><div class="stat-label">Turno Día</div></div>
+        <div class="stat-card"><div class="stat-val" id="sr-noche">—</div><div class="stat-label">Turno Noche</div></div>
+        <div class="stat-card"><div class="stat-val" id="sr-hoy">—</div><div class="stat-label">Hoy</div></div>
+        <div class="stat-card"><div class="stat-val" id="sr-semana">—</div><div class="stat-label">Esta semana</div></div>
+      </div>
+
+      <div class="table-area">
+        <div class="toolbar">
+          <input class="search-input" id="regSearch" placeholder="🔍 Buscar por nombre, código, responsable..." oninput="debounceReg()">
+          <select class="filter-select" id="regTurno" onchange="loadRegistros()">
+            <option value="">Todos los turnos</option>
+            <option>Día</option>
+            <option>Noche</option>
+          </select>
+          <input type="date" class="filter-select" id="regDesde" onchange="loadRegistros()">
+          <input type="date" class="filter-select" id="regHasta" onchange="loadRegistros()">
+          <button class="btn btn-secondary btn-sm" onclick="clearRegFiltros()">✕ Limpiar</button>
+          <span class="count-badge" id="regCountBadge">— registros</span>
+        </div>
+        <div class="data-table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th style="width:80px">Acciones</th>
+                <th>Fecha</th>
+                <th>Código</th>
+                <th>Nombre</th>
+                <th>Turno</th>
+                <th>Línea</th>
+                <th>Responsable</th>
+                <th>Especie</th>
+                <th>Proceso</th>
+                <th>Centro Costo</th>
+              </tr>
+            </thead>
+            <tbody id="tbodyReg">
+              <tr class="loading-row"><td colspan="10"><span class="spinner"></span>Cargando…</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="pagination" id="regPagination"></div>
+      </div>
+    </div>
+
+    <!-- ══ PÁGINA: EMPLEADOS ══ -->
+    <div class="page" id="page-empleados">
+      <div class="page-header">
+        <div>
+          <h1>Empleados</h1>
+          <p>Lista maestra de trabajadores registrables</p>
+        </div>
+        <div class="page-header-actions">
+          <button class="btn btn-secondary" onclick="loadEmpleados()">🔄 Recargar</button>
+          <button class="btn btn-primary" onclick="abrirModalEmpleado()">＋ Nuevo empleado</button>
+        </div>
+      </div>
+      <div class="table-area">
+        <div class="toolbar">
+          <input class="search-input" id="empSearch" placeholder="🔍 Buscar por código o nombre..." oninput="debounceEmp()">
+          <span class="count-badge" id="empCountBadge">— empleados</span>
+        </div>
+        <div class="data-table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th style="width:80px">Acciones</th>
+                <th>Código</th>
+                <th>Nombre</th>
+                <th>Centro de Costo</th>
+                <th>Tipo Contrato</th>
+                <th>Estado</th>
+              </tr>
+            </thead>
+            <tbody id="tbodyEmp">
+              <tr class="loading-row"><td colspan="6"><span class="spinner"></span>Cargando…</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="pagination" id="empPagination"></div>
+      </div>
+    </div>
+
+    <!-- ══ PÁGINA: PRODUCCION ══ -->
+    <div class="page" id="page-produccion">
+      <div class="page-header">
+        <div>
+          <h1>Catálogo de Producción</h1>
+          <p>Especies, productos, procesos, operaciones, responsables y líneas</p>
+        </div>
+        <div class="page-header-actions">
+          <button class="btn btn-secondary" onclick="loadProduccion()">🔄 Recargar</button>
+          <button class="btn btn-primary" onclick="abrirModalProduccion()">＋ Nueva entrada</button>
+        </div>
+      </div>
+      <div class="table-area">
+        <div class="toolbar">
+          <input class="search-input" id="prodSearch" placeholder="🔍 Buscar especie, producto, responsable..." oninput="debounceProd()">
+          <span class="count-badge" id="prodCountBadge">— entradas</span>
+        </div>
+        <div class="data-table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th style="width:80px">Acciones</th>
+                <th>Especie</th>
+                <th>Producto</th>
+                <th>Función</th>
+                <th>Proceso</th>
+                <th>Operación</th>
+                <th>Responsable</th>
+                <th>Línea</th>
+              </tr>
+            </thead>
+            <tbody id="tbodyProd">
+              <tr class="loading-row"><td colspan="8"><span class="spinner"></span>Cargando…</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="pagination" id="prodPagination"></div>
+      </div>
+    </div>
+
+    <!-- ══ PÁGINA: NO REGISTRAR ══ -->
+    <div class="page" id="page-noregistrar">
+      <div class="page-header">
+        <div>
+          <h1>Lista No Registrar</h1>
+          <p>Empleados excluidos del control de ausencias diarias</p>
+        </div>
+        <div class="page-header-actions">
+          <button class="btn btn-primary" onclick="abrirModalNoReg()">＋ Agregar</button>
+        </div>
+      </div>
+      <div class="table-area">
+        <div class="data-table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th style="width:80px">Acciones</th>
+                <th>Código</th>
+                <th>Nombre</th>
+                <th>Motivo</th>
+              </tr>
+            </thead>
+            <tbody id="tbodyNoReg">
+              <tr class="loading-row"><td colspan="4"><span class="spinner"></span>Cargando…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ PÁGINA: IMPORTAR ══ -->
+    <div class="page" id="page-importar">
+      <div class="page-header">
+        <div>
+          <h1>Importar Datos</h1>
+          <p>Carga masiva de registros, empleados o producción desde JSON</p>
+        </div>
+      </div>
+      <div class="settings-wrap">
+        <div class="settings-section">
+          <div class="settings-section-title"><span class="sticon">📥</span> Importar desde archivo JSON</div>
+          <div style="padding:20px">
+            <div style="margin-bottom:14px">
+              <label class="form-label">Tabla destino</label>
+              <select class="form-select" id="importTabla" style="margin-top:6px;width:220px">
+                <option value="registros">registros</option>
+                <option value="empleados">empleados</option>
+                <option value="produccion">produccion</option>
+              </select>
+            </div>
+            <input type="file" id="fileInput" accept=".json" onchange="handleFileSelect(event)">
+            <div class="import-zone" onclick="document.getElementById('fileInput').click()"
+              ondragover="event.preventDefault();this.classList.add('drag')"
+              ondragleave="this.classList.remove('drag')"
+              ondrop="handleFileDrop(event)">
+              <div class="import-zone-icon">📂</div>
+              <div class="import-zone-title">Arrastra el archivo JSON aquí</div>
+              <div class="import-zone-sub">o haz clic para seleccionar</div>
+            </div>
+            <div id="importPreview" style="display:none;margin-top:14px">
+              <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:12px">
+                <div style="font-size:11px;font-weight:700;color:var(--muted);margin-bottom:6px;font-family:var(--mono)">VISTA PREVIA</div>
+                <div id="importInfo" style="font-size:13px;color:var(--text)"></div>
+              </div>
+              <button class="btn btn-primary" id="btnImportar" onclick="ejecutarImport()">
+                📥 Importar todos los registros
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="settings-section">
+          <div class="settings-section-title"><span class="sticon">⚡</span> Importar SQL directamente</div>
+          <div style="padding:20px">
+            <p style="font-size:13px;color:var(--muted);margin-bottom:12px">Pega directamente el contenido de los archivos batch_XX.sql generados:</p>
+            <textarea id="sqlInput" class="form-input" rows="8" placeholder="Pega aquí el contenido SQL..." style="resize:vertical;font-family:var(--mono);font-size:11px"></textarea>
+            <div style="margin-top:10px">
+              <button class="btn btn-warn" onclick="ejecutarSQL()">⚡ Ejecutar SQL</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ PÁGINA: EXPORTAR ══ -->
+    <div class="page" id="page-exportar">
+      <div class="page-header">
+        <div><h1>Exportar Datos</h1><p>Descarga los datos en formato JSON o CSV</p></div>
+      </div>
+      <div class="settings-wrap">
+        <div class="settings-section">
+          <div class="settings-section-title"><span class="sticon">📤</span> Exportar tabla</div>
+          <div style="padding:20px;display:flex;flex-direction:column;gap:12px">
+            <div style="display:flex;gap:10px;flex-wrap:wrap">
+              <button class="btn btn-secondary" onclick="exportarTabla('registros','json')">📝 Registros → JSON</button>
+              <button class="btn btn-secondary" onclick="exportarTabla('registros','csv')">📝 Registros → CSV</button>
+              <button class="btn btn-secondary" onclick="exportarTabla('empleados','json')">👥 Empleados → JSON</button>
+              <button class="btn btn-secondary" onclick="exportarTabla('empleados','csv')">👥 Empleados → CSV</button>
+              <button class="btn btn-secondary" onclick="exportarTabla('produccion','json')">🏭 Producción → JSON</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ PÁGINA: AUDIT LOG ══ -->
+    <div class="page" id="page-auditlog">
+      <div class="page-header">
+        <div><h1>Log de Auditoría</h1><p>Historial de todas las operaciones realizadas</p></div>
+        <div class="page-header-actions">
+          <button class="btn btn-secondary" onclick="loadAuditLog()">🔄 Recargar</button>
+        </div>
+      </div>
+      <div class="table-area">
+        <div class="data-table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Timestamp</th>
+                <th>Usuario</th>
+                <th>Acción</th>
+                <th>Detalle</th>
+              </tr>
+            </thead>
+            <tbody id="tbodyAudit">
+              <tr class="loading-row"><td colspan="4"><span class="spinner"></span>Cargando…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ PÁGINA: SETTINGS ══ -->
+    <div class="page" id="page-settings">
+      <div class="page-header">
+        <div><h1>⚙️ Configuración</h1><p>Conexión a Supabase y opciones del sistema</p></div>
+      </div>
+      <div class="settings-wrap">
+
+        <div class="settings-section">
+          <div class="settings-section-title"><span class="sticon">🔌</span> Conexión Supabase</div>
+          <div class="settings-row">
+            <div class="settings-row-info">
+              <div class="settings-row-label">URL del proyecto</div>
+              <div class="settings-row-desc">Ej: https://abcxyz.supabase.co</div>
+            </div>
+            <input class="settings-input" id="cfg-url" type="text" placeholder="https://TU_PROYECTO.supabase.co">
+          </div>
+          <div class="settings-row">
+            <div class="settings-row-info">
+              <div class="settings-row-label">Anon Key</div>
+              <div class="settings-row-desc">La clave pública (anon/public)</div>
+            </div>
+            <input class="settings-input" id="cfg-key" type="password" placeholder="eyJhbGci...">
+          </div>
+          <div class="settings-row" style="border:none">
+            <div class="settings-row-info">
+              <div class="settings-row-label">API Vacaciones (Apps Script)</div>
+              <div class="settings-row-desc">URL del Web App de Google Scripts para vacaciones</div>
+            </div>
+            <input class="settings-input" id="cfg-vac" type="text" placeholder="https://script.google.com/macros/s/...">
+          </div>
+          <div class="settings-row" style="border:none">
+            <div class="settings-row-info">
+              <div class="settings-row-label">API Permisos (Apps Script)</div>
+              <div class="settings-row-desc">URL del Web App para permisos médicos/personales/judiciales</div>
+            </div>
+            <input class="settings-input" id="cfg-perm" type="text" placeholder="https://script.google.com/macros/s/...">
+          </div>
+          <div style="padding:14px 18px;display:flex;gap:10px;border-top:1px solid var(--border)">
+            <button class="btn btn-primary" onclick="guardarConfig()">💾 Guardar configuración</button>
+            <button class="btn btn-secondary" onclick="probarConexion()">🔌 Probar conexión</button>
+          </div>
+        </div>
+
+        <div class="settings-section">
+          <div class="settings-section-title"><span class="sticon">🗃️</span> Mantenimiento</div>
+          <div class="settings-row">
+            <div class="settings-row-info">
+              <div class="settings-row-label">Limpiar caché</div>
+              <div class="settings-row-desc">Vacía la caché en memoria de listas y empleados</div>
+            </div>
+            <button class="btn btn-secondary btn-sm" onclick="limpiarCache()">🗑 Limpiar</button>
+          </div>
+          <div class="settings-row">
+            <div class="settings-row-info">
+              <div class="settings-row-label">Ver estadísticas</div>
+              <div class="settings-row-desc">Totales de cada tabla en Supabase</div>
+            </div>
+            <button class="btn btn-secondary btn-sm" onclick="verStats()">📊 Ver</button>
+          </div>
+          <div class="settings-row" style="border:none">
+            <div class="settings-row-info">
+              <div class="settings-row-label" style="color:var(--danger)">Eliminar TODOS los registros</div>
+              <div class="settings-row-desc">Borra toda la tabla registros. Irreversible.</div>
+            </div>
+            <button class="btn btn-danger btn-sm" onclick="confirmarBorrarTodo()">⚠️ Borrar todo</button>
+          </div>
+        </div>
+
+        <div class="settings-section">
+          <div class="settings-section-title"><span class="sticon">ℹ️</span> Acerca de</div>
+          <div class="settings-row" style="border:none">
+            <div class="settings-row-info">
+              <div class="settings-row-label">Admin Panel · Sistema de Asistencia Friosur</div>
+              <div class="settings-row-desc">v3.0-supabase · Pesquera Friosur SpA</div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+  </div><!-- /main-panel -->
+</div><!-- /app-body -->
+
+<!-- ══ TOAST ══ -->
+<div id="toast"></div>
+
+<!-- ══ MODAL REGISTRO ══ -->
+<div class="modal-overlay" id="modalReg">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="modalRegTitle">Nuevo Registro</h2>
+      <button class="modal-close" onclick="cerrarModal('modalReg')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-field"><label class="form-label">Fecha *</label><input class="form-input" id="rf-fecha" type="date"></div>
+        <div class="form-field"><label class="form-label">Turno *</label>
+          <select class="form-select" id="rf-turno"><option>Día</option><option>Noche</option></select></div>
+        <div class="form-field"><label class="form-label">Código Empleado *</label><input class="form-input" id="rf-codigo" placeholder="Ej: M6327"></div>
+        <div class="form-field"><label class="form-label">Nombre *</label><input class="form-input" id="rf-nombre" placeholder="Apellido Nombre"></div>
+        <div class="form-field"><label class="form-label">Responsable</label><input class="form-input" id="rf-resp" placeholder="Nombre responsable"></div>
+        <div class="form-field"><label class="form-label">Línea</label><input class="form-input" id="rf-linea" placeholder="Ej: 1, EMPAQUE"></div>
+        <div class="form-field"><label class="form-label">Centro de Costo</label><input class="form-input" id="rf-cc" placeholder="Ej: 1110 -PRODUCCIÓN"></div>
+        <div class="form-field"><label class="form-label">Tipo Contrato</label>
+          <select class="form-select" id="rf-contrato"><option value="">—</option><option>Indefinido</option><option>Plazo Fijo</option><option>Temporeros</option><option>Honorarios</option></select></div>
+        <div class="form-field"><label class="form-label">Especie</label><input class="form-input" id="rf-especie" placeholder="Ej: MERLUZA AUSTRAL"></div>
+        <div class="form-field"><label class="form-label">Producto</label><input class="form-input" id="rf-producto" placeholder="Ej: PORCION ESPAÑA"></div>
+        <div class="form-field"><label class="form-label">Proceso</label><input class="form-input" id="rf-proceso" placeholder="Ej: CONGELADO"></div>
+        <div class="form-field"><label class="form-label">Operación</label><input class="form-input" id="rf-operacion" placeholder="Ej: PORCIONADO MANUAL"></div>
+        <div class="form-field"><label class="form-label">Función</label><input class="form-input" id="rf-funcion" placeholder="Ej: ABASTECIMIENTO"></div>
+        <div class="form-field"><label class="form-label">Atraso inicio (min)</label><input class="form-input" id="rf-atraso" type="number" value="0" min="0"></div>
+        <div class="form-field"><label class="form-label">Proceso Inicio</label><input class="form-input" id="rf-proc-ini" type="datetime-local"></div>
+        <div class="form-field"><label class="form-label">Proceso Término</label><input class="form-input" id="rf-proc-ter" type="datetime-local"></div>
+        <div class="form-field"><label class="form-label">Descanso Inicio</label><input class="form-input" id="rf-desc-ini" type="datetime-local"></div>
+        <div class="form-field"><label class="form-label">Descanso Término</label><input class="form-input" id="rf-desc-ter" type="datetime-local"></div>
+        <div class="form-field"><label class="form-label">Desayuno Programado</label>
+          <select class="form-select" id="rf-desayuno"><option value="">—</option><option>Sí</option><option>No</option><option>No aplica</option></select></div>
+        <div class="form-field"><label class="form-label">Colación Inicio</label><input class="form-input" id="rf-col-ini" type="datetime-local"></div>
+        <div class="form-field"><label class="form-label">Colación Término</label><input class="form-input" id="rf-col-ter" type="datetime-local"></div>
+        <div class="form-field"><label class="form-label">Colación Programada</label>
+          <select class="form-select" id="rf-colacion"><option value="">—</option><option>Sí</option><option>No</option><option>No aplica</option></select></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="cerrarModal('modalReg')">Cancelar</button>
+      <button class="btn btn-primary" onclick="guardarRegistro()">💾 Guardar registro</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL EMPLEADO ══ -->
+<div class="modal-overlay" id="modalEmp">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="modalEmpTitle">Nuevo Empleado</h2>
+      <button class="modal-close" onclick="cerrarModal('modalEmp')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-field"><label class="form-label">Código *</label><input class="form-input" id="ef-codigo" placeholder="Ej: M6327"></div>
+        <div class="form-field"><label class="form-label">Nombre completo *</label><input class="form-input" id="ef-nombre" placeholder="APELLIDO NOMBRE"></div>
+        <div class="form-field"><label class="form-label">Centro de Costo</label><input class="form-input" id="ef-cc" placeholder="Ej: 1110 -PRODUCCIÓN (FS)"></div>
+        <div class="form-field"><label class="form-label">Tipo Contrato</label>
+          <select class="form-select" id="ef-contrato">
+            <option value="">—</option><option>Indefinido</option><option>Plazo Fijo</option><option>Temporeros</option><option>Honorarios</option>
+          </select></div>
+        <div class="form-field"><label class="form-label">Activo</label>
+          <select class="form-select" id="ef-activo"><option value="true">Sí</option><option value="false">No</option></select></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="cerrarModal('modalEmp')">Cancelar</button>
+      <button class="btn btn-primary" onclick="guardarEmpleado()">💾 Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL PRODUCCION ══ -->
+<div class="modal-overlay" id="modalProd">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="modalProdTitle">Nueva entrada de Producción</h2>
+      <button class="modal-close" onclick="cerrarModal('modalProd')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-field"><label class="form-label">Especie</label><input class="form-input" id="pf-especie" placeholder="Ej: MERLUZA AUSTRAL"></div>
+        <div class="form-field"><label class="form-label">Producto</label><input class="form-input" id="pf-producto" placeholder="Ej: PORCION ESPAÑA"></div>
+        <div class="form-field"><label class="form-label">Función</label><input class="form-input" id="pf-funcion" placeholder="Ej: ABASTECIMIENTO"></div>
+        <div class="form-field"><label class="form-label">Proceso</label><input class="form-input" id="pf-proceso" placeholder="Ej: CONGELADO"></div>
+        <div class="form-field"><label class="form-label">Operación</label><input class="form-input" id="pf-operacion" placeholder="Ej: PORCIONADO MANUAL"></div>
+        <div class="form-field"><label class="form-label">Responsable</label><input class="form-input" id="pf-resp" placeholder="Nombre responsable"></div>
+        <div class="form-field"><label class="form-label">Línea</label><input class="form-input" id="pf-linea" placeholder="Ej: 1, EMPAQUE"></div>
+        <div class="form-field"><label class="form-label">Línea Especial</label><input class="form-input" id="pf-linea-esp" placeholder="Ej: EMPAQUE"></div>
+        <div class="form-field full"><label class="form-label">Función Especial</label><input class="form-input" id="pf-func-esp" placeholder="Ej: Operario Empaque"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="cerrarModal('modalProd')">Cancelar</button>
+      <button class="btn btn-primary" onclick="guardarProduccion()">💾 Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL NO REGISTRAR ══ -->
+<div class="modal-overlay" id="modalNoReg">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-header">
+      <h2>Agregar a No Registrar</h2>
+      <button class="modal-close" onclick="cerrarModal('modalNoReg')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid cols1">
+        <div class="form-field"><label class="form-label">Código (opcional)</label><input class="form-input" id="nrf-codigo" placeholder="Ej: M6327"></div>
+        <div class="form-field"><label class="form-label">Nombre (opcional)</label><input class="form-input" id="nrf-nombre" placeholder="APELLIDO NOMBRE"></div>
+        <div class="form-field"><label class="form-label">Motivo</label><input class="form-input" id="nrf-motivo" placeholder="Ej: Gerencia, Staff"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="cerrarModal('modalNoReg')">Cancelar</button>
+      <button class="btn btn-primary" onclick="guardarNoReg()">💾 Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ CONFIRM DELETE ══ -->
+<div class="modal-overlay" id="modalConfirm">
+  <div class="confirm-box">
+    <h3>⚠️ Confirmar eliminación</h3>
+    <p id="confirmMsg">¿Estás seguro de que quieres eliminar este registro?</p>
+    <div class="confirm-btns">
+      <button class="btn btn-secondary" onclick="cerrarModal('modalConfirm')">Cancelar</button>
+      <button class="btn btn-danger" onclick="ejecutarEliminar()">🗑 Eliminar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ════════════════════════════════════════════════════
+//  CONFIG — se lee de localStorage, editable en Settings
+// ════════════════════════════════════════════════════
+const CFG_KEY = 'friosur_admin_cfg';
+
+function getCfg() {
+  try {
+    const s = localStorage.getItem(CFG_KEY);
+    return s ? JSON.parse(s) : {};
+  } catch { return {}; }
+}
+
+function saveCfg(cfg) {
+  localStorage.setItem(CFG_KEY, JSON.stringify(cfg));
+}
+
+// ════════════════════════════════════════════════════
+//  SUPABASE CLIENT
+// ════════════════════════════════════════════════════
+let _sb = null;
+
+function getClient() {
+  const cfg = getCfg();
+  const url = cfg.url || '';
+  const key = cfg.key || '';
+  if (!url || !key) return null;
+  if (!_sb || _sb._url !== url) {
+    _sb = supabase.createClient(url, key);
+    _sb._url = url;
+  }
+  return _sb;
+}
+
+async function checkConn() {
+  const badge = document.getElementById('connBadge');
+  const txt   = document.getElementById('connText');
+  const db = getClient();
+  if (!db) {
+    badge.className = 'conn-badge err';
+    txt.textContent = 'Sin configurar';
+    return false;
+  }
+  try {
+    const { error } = await db.from('registros').select('id', { count:'exact', head:true });
+    if (error) throw error;
+    badge.className = 'conn-badge ok';
+    txt.textContent = 'Conectado';
+    return true;
+  } catch(e) {
+    badge.className = 'conn-badge err';
+    txt.textContent = 'Error de conexión';
+    return false;
+  }
+}
+
+// ════════════════════════════════════════════════════
+//  TOAST
+// ════════════════════════════════════════════════════
+function toast(msg, type = 'success', ms = 3000) {
+  const t = document.getElementById('toast');
+  clearTimeout(t._t);
+  t.className = '';
+  t.textContent = msg;
+  void t.offsetWidth;
+  t.className = `show ${type}`;
+  t._t = setTimeout(() => t.classList.remove('show'), ms);
+}
+
+// ════════════════════════════════════════════════════
+//  NAVIGATION
+// ════════════════════════════════════════════════════
+function goPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.sidebar-item').forEach(i => i.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  document.querySelectorAll('.sidebar-item').forEach(i => {
+    if (i.getAttribute('onclick')?.includes("'" + name + "'")) i.classList.add('active');
+  });
+
+  // Cargar datos al entrar a la página
+  const loaders = {
+    registros:  loadRegistros,
+    empleados:  loadEmpleados,
+    produccion: loadProduccion,
+    noregistrar:loadNoRegistrar,
+    auditlog:   loadAuditLog,
+    settings:   cargarSettings,
+  };
+  if (loaders[name]) loaders[name]();
+}
+
+// ════════════════════════════════════════════════════
+//  MODAL HELPERS
+// ════════════════════════════════════════════════════
+function cerrarModal(id) {
+  document.getElementById(id).classList.remove('open');
+  _editingId = null;
+}
+
+document.querySelectorAll('.modal-overlay').forEach(m => {
+  m.addEventListener('click', e => { if (e.target === m) m.classList.remove('open'); });
+});
+
+let _editingId = null;
+let _confirmAction = null;
+
+// ════════════════════════════════════════════════════
+//  UTILS
+// ════════════════════════════════════════════════════
+function esc(v) {
+  return String(v ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+function fmtFecha(v) {
+  if (!v) return '—';
+  return String(v).substring(0, 10);
+}
+function fmtTs(v) {
+  if (!v) return '—';
+  return String(v).replace('T',' ').substring(0, 16);
+}
+function localToday() {
+  const d = new Date();
+  return d.toISOString().substring(0, 10);
+}
+
+let _debounceTimers = {};
+function debounce(key, fn, ms = 400) {
+  clearTimeout(_debounceTimers[key]);
+  _debounceTimers[key] = setTimeout(fn, ms);
+}
+function debounceReg()  { debounce('reg',  loadRegistros); }
+function debounceEmp()  { debounce('emp',  loadEmpleados); }
+function debounceProd() { debounce('prod', loadProduccion); }
+
+// ════════════════════════════════════════════════════
+//  COUNTS SIDEBAR
+// ════════════════════════════════════════════════════
+async function loadCounts() {
+  const db = getClient(); if (!db) return;
+  const tables = ['registros','empleados','produccion','noregistrar','audit_log'];
+  for (const t of tables) {
+    const { count } = await db.from(t).select('*', { count:'exact', head:true });
+    const el = document.getElementById('cnt-' + (t === 'audit_log' ? 'auditlog' : t));
+    if (el) el.textContent = count ?? '—';
+  }
+}
+
+// ════════════════════════════════════════════════════
+//  ═══ REGISTROS ═══
+// ════════════════════════════════════════════════════
+let _regPage = 1;
+const REG_PER_PAGE = 50;
+
+async function loadRegistros() {
+  const db = getClient();
+  if (!db) { toast('Configura la conexión Supabase primero','error'); return; }
+
+  const tbody = document.getElementById('tbodyReg');
+  tbody.innerHTML = '<tr class="loading-row"><td colspan="10"><span class="spinner"></span>Cargando…</td></tr>';
+
+  const search = document.getElementById('regSearch').value.trim();
+  const turno  = document.getElementById('regTurno').value;
+  const desde  = document.getElementById('regDesde').value;
+  const hasta  = document.getElementById('regHasta').value;
+
+  let q = db.from('registros').select('*', { count:'exact' });
+  if (turno)  q = q.eq('turno', turno);
+  if (desde)  q = q.gte('fecha', desde);
+  if (hasta)  q = q.lte('fecha', hasta);
+  if (search) q = q.or(`codigo.ilike.%${search}%,nombre.ilike.%${search}%,responsable.ilike.%${search}%`);
+
+  const from = (_regPage - 1) * REG_PER_PAGE;
+  q = q.order('fecha', {ascending:false}).order('created_at',{ascending:false}).range(from, from + REG_PER_PAGE - 1);
+
+  const { data, error, count } = await q;
+  if (error) { toast('Error cargando registros: '+error.message,'error'); tbody.innerHTML=''; return; }
+
+  document.getElementById('regCountBadge').textContent = `${count ?? 0} registros`;
+  renderRegStats(count);
+
+  if (!data?.length) {
+    tbody.innerHTML = '<tr><td colspan="10"><div class="empty-state"><div class="ei">🔍</div><p>Sin resultados</p></div></td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = data.map(r => `
+    <tr>
+      <td>
+        <div class="td-actions">
+          <button class="btn btn-secondary btn-sm" onclick="editarRegistro('${r.id}')">✏️</button>
+          <button class="btn btn-danger btn-sm" onclick="confirmarEliminar('${r.id}','Registro ${esc(r.codigo)} ${esc(r.nombre)} del ${r.fecha}')">🗑</button>
+        </div>
+      </td>
+      <td>${fmtFecha(r.fecha)}</td>
+      <td><strong style="font-family:var(--mono);color:var(--accent2)">${esc(r.codigo)}</strong></td>
+      <td title="${esc(r.nombre)}">${esc(r.nombre)}</td>
+      <td><span class="badge ${r.turno==='Noche'?'badge-noche':'badge-dia'}">${esc(r.turno)}</span></td>
+      <td>${esc(r.linea)}</td>
+      <td>${esc(r.responsable)}</td>
+      <td>${esc(r.especie)}</td>
+      <td>${esc(r.proceso)}</td>
+      <td>${esc(r.centro_costo)}</td>
+    </tr>`).join('');
+
+  renderPagination('regPagination', count, _regPage, REG_PER_PAGE, p => { _regPage = p; loadRegistros(); });
+}
+
+async function renderRegStats(total) {
+  const db = getClient(); if (!db) return;
+  const hoy = localToday();
+  const [{ count: dia }, { count: noche }, { count: hoyC }] = await Promise.all([
+    db.from('registros').select('*',{count:'exact',head:true}).eq('turno','Día'),
+    db.from('registros').select('*',{count:'exact',head:true}).eq('turno','Noche'),
+    db.from('registros').select('*',{count:'exact',head:true}).eq('fecha', hoy),
+  ]);
+  document.getElementById('sr-total').textContent  = total ?? '—';
+  document.getElementById('sr-dia').textContent    = dia ?? 0;
+  document.getElementById('sr-noche').textContent  = noche ?? 0;
+  document.getElementById('sr-hoy').textContent    = hoyC ?? 0;
+}
+
+function clearRegFiltros() {
+  document.getElementById('regSearch').value = '';
+  document.getElementById('regTurno').value  = '';
+  document.getElementById('regDesde').value  = '';
+  document.getElementById('regHasta').value  = '';
+  _regPage = 1;
+  loadRegistros();
+}
+
+function abrirModalRegistro(r = null) {
+  _editingId = r ? r.id : null;
+  document.getElementById('modalRegTitle').textContent = r ? 'Editar Registro' : 'Nuevo Registro';
+  const campos = ['fecha','turno','codigo','nombre','resp','linea','cc','contrato',
+    'especie','producto','proceso','operacion','funcion','atraso',
+    'proc-ini','proc-ter','desc-ini','desc-ter','desayuno','col-ini','col-ter','colacion'];
+
+  const map = {
+    'fecha': r?.fecha ?? localToday(),
+    'turno': r?.turno ?? 'Día',
+    'codigo': r?.codigo ?? '',
+    'nombre': r?.nombre ?? '',
+    'resp': r?.responsable ?? '',
+    'linea': r?.linea ?? '',
+    'cc': r?.centro_costo ?? '',
+    'contrato': r?.tipo_contrato ?? '',
+    'especie': r?.especie ?? '',
+    'producto': r?.producto ?? '',
+    'proceso': r?.proceso ?? '',
+    'operacion': r?.operacion ?? '',
+    'funcion': r?.funcion ?? '',
+    'atraso': r?.atraso_inicio ?? '0',
+    'proc-ini': r?.proceso_inicio ? r.proceso_inicio.substring(0,16).replace(' ','T') : '',
+    'proc-ter': r?.proceso_termino ? r.proceso_termino.substring(0,16).replace(' ','T') : '',
+    'desc-ini': r?.descanso_inicio ? r.descanso_inicio.substring(0,16).replace(' ','T') : '',
+    'desc-ter': r?.descanso_termino ? r.descanso_termino.substring(0,16).replace(' ','T') : '',
+    'desayuno': r?.desayuno_programado ?? '',
+    'col-ini': r?.colacion_inicio ? r.colacion_inicio.substring(0,16).replace(' ','T') : '',
+    'col-ter': r?.colacion_termino ? r.colacion_termino.substring(0,16).replace(' ','T') : '',
+    'colacion': r?.colacion_programado ?? '',
+  };
+
+  for (const [k, v] of Object.entries(map)) {
+    const el = document.getElementById('rf-' + k);
+    if (el) el.value = v;
+  }
+  document.getElementById('modalReg').classList.add('open');
+}
+
+async function editarRegistro(id) {
+  const db = getClient();
+  const { data } = await db.from('registros').select('*').eq('id', id).single();
+  if (data) abrirModalRegistro(data);
+}
+
+async function guardarRegistro() {
+  const db = getClient(); if (!db) return;
+  const g = id => document.getElementById(id)?.value ?? '';
+  const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  const fecha = g('rf-fecha');
+  if (!fecha || !g('rf-codigo') || !g('rf-nombre')) { toast('Fecha, código y nombre son obligatorios','error'); return; }
+
+  const payload = {
+    mes: MESES[new Date(fecha+'T12:00').getMonth()],
+    fecha, responsable: g('rf-resp'), turno: g('rf-turno'), linea: g('rf-linea'),
+    codigo: g('rf-codigo'), nombre: g('rf-nombre'),
+    tipo_contrato: g('rf-contrato'), funcion: g('rf-funcion'), centro_costo: g('rf-cc'),
+    especie: g('rf-especie'), producto: g('rf-producto'), proceso: g('rf-proceso'), operacion: g('rf-operacion'),
+    proceso_inicio:   g('rf-proc-ini')  || null,
+    proceso_termino:  g('rf-proc-ter')  || null,
+    atraso_inicio:    g('rf-atraso')    || '0',
+    descanso_inicio:  g('rf-desc-ini')  || null,
+    descanso_termino: g('rf-desc-ter')  || null,
+    desayuno_programado: g('rf-desayuno'),
+    colacion_inicio:  g('rf-col-ini')   || null,
+    colacion_termino: g('rf-col-ter')   || null,
+    colacion_programado: g('rf-colacion'),
+  };
+
+  let error;
+  if (_editingId) {
+    ({ error } = await db.from('registros').update(payload).eq('id', _editingId));
+  } else {
+    ({ error } = await db.from('registros').insert(payload));
+  }
+
+  if (error) { toast('Error: '+error.message, 'error'); return; }
+  toast(_editingId ? '✅ Registro actualizado' : '✅ Registro guardado');
+  cerrarModal('modalReg');
+  loadRegistros();
+  loadCounts();
+}
+
+// ════════════════════════════════════════════════════
+//  ═══ EMPLEADOS ═══
+// ════════════════════════════════════════════════════
+let _empPage = 1;
+const EMP_PER_PAGE = 60;
+
+async function loadEmpleados() {
+  const db = getClient(); if (!db) return;
+  const tbody = document.getElementById('tbodyEmp');
+  tbody.innerHTML = '<tr class="loading-row"><td colspan="6"><span class="spinner"></span>Cargando…</td></tr>';
+
+  const search = document.getElementById('empSearch').value.trim();
+  let q = db.from('empleados').select('*', { count:'exact' }).order('nombre');
+  if (search) q = q.or(`codigo.ilike.%${search}%,nombre.ilike.%${search}%`);
+
+  const from = (_empPage - 1) * EMP_PER_PAGE;
+  q = q.range(from, from + EMP_PER_PAGE - 1);
+
+  const { data, error, count } = await q;
+  if (error) { toast('Error: '+error.message,'error'); return; }
+
+  document.getElementById('empCountBadge').textContent = `${count ?? 0} empleados`;
+
+  if (!data?.length) {
+    tbody.innerHTML = '<tr><td colspan="6"><div class="empty-state"><div class="ei">👥</div><p>Sin empleados</p></div></td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = data.map(r => `
+    <tr>
+      <td>
+        <div class="td-actions">
+          <button class="btn btn-secondary btn-sm" onclick="editarEmpleado('${r.id}')">✏️</button>
+          <button class="btn btn-danger btn-sm" onclick="confirmarEliminar('${r.id}_emp','${esc(r.nombre)}')">🗑</button>
+        </div>
+      </td>
+      <td><strong style="font-family:var(--mono);color:var(--accent2)">${esc(r.codigo)}</strong></td>
+      <td>${esc(r.nombre)}</td>
+      <td>${esc(r.centro_costo)}</td>
+      <td>${esc(r.contrato)}</td>
+      <td><span class="badge badge-active">${r.activo?'Activo':'Inactivo'}</span></td>
+    </tr>`).join('');
+
+  renderPagination('empPagination', count, _empPage, EMP_PER_PAGE, p => { _empPage = p; loadEmpleados(); });
+}
+
+function abrirModalEmpleado(r = null) {
+  _editingId = r?.id ?? null;
+  document.getElementById('modalEmpTitle').textContent = r ? 'Editar Empleado' : 'Nuevo Empleado';
+  document.getElementById('ef-codigo').value   = r?.codigo   ?? '';
+  document.getElementById('ef-nombre').value   = r?.nombre   ?? '';
+  document.getElementById('ef-cc').value       = r?.centro_costo ?? '';
+  document.getElementById('ef-contrato').value = r?.contrato ?? '';
+  document.getElementById('ef-activo').value   = String(r?.activo ?? 'true');
+  document.getElementById('modalEmp').classList.add('open');
+}
+
+async function editarEmpleado(id) {
+  const db = getClient();
+  const { data } = await db.from('empleados').select('*').eq('id', id).single();
+  if (data) abrirModalEmpleado(data);
+}
+
+async function guardarEmpleado() {
+  const db = getClient(); if (!db) return;
+  const codigo = document.getElementById('ef-codigo').value.trim();
+  const nombre = document.getElementById('ef-nombre').value.trim();
+  if (!codigo || !nombre) { toast('Código y nombre son obligatorios','error'); return; }
+
+  const payload = {
+    codigo, nombre,
+    centro_costo: document.getElementById('ef-cc').value.trim(),
+    contrato:     document.getElementById('ef-contrato').value.trim(),
+    activo:       document.getElementById('ef-activo').value === 'true',
+  };
+
+  let error;
+  if (_editingId) {
+    ({ error } = await db.from('empleados').update(payload).eq('id', _editingId));
+  } else {
+    ({ error } = await db.from('empleados').insert(payload));
+  }
+
+  if (error) { toast('Error: '+error.message,'error'); return; }
+  toast(_editingId ? '✅ Empleado actualizado' : '✅ Empleado agregado');
+  cerrarModal('modalEmp');
+  loadEmpleados();
+  loadCounts();
+}
+
+// ════════════════════════════════════════════════════
+//  ═══ PRODUCCIÓN ═══
+// ════════════════════════════════════════════════════
+let _prodPage = 1;
+const PROD_PER_PAGE = 50;
+
+async function loadProduccion() {
+  const db = getClient(); if (!db) return;
+  const tbody = document.getElementById('tbodyProd');
+  tbody.innerHTML = '<tr class="loading-row"><td colspan="8"><span class="spinner"></span>Cargando…</td></tr>';
+
+  const search = document.getElementById('prodSearch').value.trim();
+  let q = db.from('produccion').select('*', { count:'exact' }).order('especie').order('producto');
+  if (search) q = q.or(`especie.ilike.%${search}%,producto.ilike.%${search}%,responsable.ilike.%${search}%,proceso.ilike.%${search}%`);
+
+  const from = (_prodPage - 1) * PROD_PER_PAGE;
+  q = q.range(from, from + PROD_PER_PAGE - 1);
+
+  const { data, error, count } = await q;
+  if (error) { toast('Error: '+error.message,'error'); return; }
+
+  document.getElementById('prodCountBadge').textContent = `${count ?? 0} entradas`;
+
+  if (!data?.length) {
+    tbody.innerHTML = '<tr><td colspan="8"><div class="empty-state"><div class="ei">🏭</div><p>Sin datos de producción</p></div></td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = data.map(r => `
+    <tr>
+      <td>
+        <div class="td-actions">
+          <button class="btn btn-secondary btn-sm" onclick="editarProduccion('${r.id}')">✏️</button>
+          <button class="btn btn-danger btn-sm" onclick="confirmarEliminar('${r.id}_prod','${esc(r.especie)} / ${esc(r.producto)}')">🗑</button>
+        </div>
+      </td>
+      <td>${esc(r.especie)}</td>
+      <td>${esc(r.producto)}</td>
+      <td>${esc(r.funcion)}</td>
+      <td>${esc(r.proceso)}</td>
+      <td>${esc(r.operacion)}</td>
+      <td>${esc(r.responsable)}</td>
+      <td>${esc(r.linea)}</td>
+    </tr>`).join('');
+
+  renderPagination('prodPagination', count, _prodPage, PROD_PER_PAGE, p => { _prodPage = p; loadProduccion(); });
+}
+
+function abrirModalProduccion(r = null) {
+  _editingId = r?.id ?? null;
+  document.getElementById('modalProdTitle').textContent = r ? 'Editar entrada' : 'Nueva entrada de Producción';
+  ['especie','producto','funcion','proceso','operacion','resp','linea','linea-esp','func-esp'].forEach(k => {
+    const map = {
+      'especie':'especie','producto':'producto','funcion':'funcion','proceso':'proceso',
+      'operacion':'operacion','resp':'responsable','linea':'linea','linea-esp':'linea_especial','func-esp':'funcion_especial'
+    };
+    document.getElementById('pf-'+k).value = r?.[map[k]] ?? '';
+  });
+  document.getElementById('modalProd').classList.add('open');
+}
+
+async function editarProduccion(id) {
+  const db = getClient();
+  const { data } = await db.from('produccion').select('*').eq('id', id).single();
+  if (data) abrirModalProduccion(data);
+}
+
+async function guardarProduccion() {
+  const db = getClient(); if (!db) return;
+  const g = k => document.getElementById('pf-'+k).value.trim();
+  const payload = {
+    especie: g('especie'), producto: g('producto'), funcion: g('funcion'),
+    proceso: g('proceso'), operacion: g('operacion'), responsable: g('resp'),
+    linea: g('linea'), linea_especial: g('linea-esp'), funcion_especial: g('func-esp'),
+    activo: true,
+  };
+
+  let error;
+  if (_editingId) {
+    ({ error } = await db.from('produccion').update(payload).eq('id', _editingId));
+  } else {
+    ({ error } = await db.from('produccion').insert(payload));
+  }
+
+  if (error) { toast('Error: '+error.message,'error'); return; }
+  toast(_editingId ? '✅ Actualizado' : '✅ Entrada agregada');
+  cerrarModal('modalProd');
+  loadProduccion();
+  loadCounts();
+}
+
+// ════════════════════════════════════════════════════
+//  ═══ NO REGISTRAR ═══
+// ════════════════════════════════════════════════════
+async function loadNoRegistrar() {
+  const db = getClient(); if (!db) return;
+  const tbody = document.getElementById('tbodyNoReg');
+  tbody.innerHTML = '<tr class="loading-row"><td colspan="4"><span class="spinner"></span>Cargando…</td></tr>';
+
+  const { data, error } = await db.from('noregistrar').select('*').order('nombre');
+  if (error) { toast('Error: '+error.message,'error'); return; }
+
+  if (!data?.length) {
+    tbody.innerHTML = '<tr><td colspan="4"><div class="empty-state"><div class="ei">🚫</div><p>Lista vacía</p></div></td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = data.map(r => `
+    <tr>
+      <td><button class="btn btn-danger btn-sm" onclick="confirmarEliminar('${r.id}_noreg','${esc(r.nombre||r.codigo)}')">🗑</button></td>
+      <td><strong style="font-family:var(--mono)">${esc(r.codigo)}</strong></td>
+      <td>${esc(r.nombre)}</td>
+      <td>${esc(r.motivo)}</td>
+    </tr>`).join('');
+}
+
+function abrirModalNoReg() {
+  document.getElementById('nrf-codigo').value = '';
+  document.getElementById('nrf-nombre').value = '';
+  document.getElementById('nrf-motivo').value = '';
+  document.getElementById('modalNoReg').classList.add('open');
+}
+
+async function guardarNoReg() {
+  const db = getClient(); if (!db) return;
+  const payload = {
+    codigo: document.getElementById('nrf-codigo').value.trim(),
+    nombre: document.getElementById('nrf-nombre').value.trim(),
+    motivo: document.getElementById('nrf-motivo').value.trim(),
+  };
+  const { error } = await db.from('noregistrar').insert(payload);
+  if (error) { toast('Error: '+error.message,'error'); return; }
+  toast('✅ Agregado');
+  cerrarModal('modalNoReg');
+  loadNoRegistrar();
+  loadCounts();
+}
+
+// ════════════════════════════════════════════════════
+//  ═══ AUDIT LOG ═══
+// ════════════════════════════════════════════════════
+async function loadAuditLog() {
+  const db = getClient(); if (!db) return;
+  const tbody = document.getElementById('tbodyAudit');
+  tbody.innerHTML = '<tr class="loading-row"><td colspan="4"><span class="spinner"></span>Cargando…</td></tr>';
+
+  const { data, error } = await db.from('audit_log').select('*').order('timestamp',{ascending:false}).limit(200);
+  if (error) { toast('Error: '+error.message,'error'); return; }
+
+  if (!data?.length) {
+    tbody.innerHTML = '<tr><td colspan="4"><div class="empty-state"><div class="ei">🔍</div><p>Sin registros</p></div></td></tr>';
+    return;
+  }
+
+  const colAccion = { CREATE:'badge-active', UPDATE:'badge-dia', DELETE:'badge-noche' };
+  tbody.innerHTML = data.map(r => `
+    <tr>
+      <td style="font-family:var(--mono);font-size:11px">${fmtTs(r.timestamp)}</td>
+      <td>${esc(r.usuario)}</td>
+      <td><span class="badge ${colAccion[r.accion]||''}">${esc(r.accion)}</span></td>
+      <td title="${esc(r.detalle)}" style="max-width:300px;overflow:hidden;text-overflow:ellipsis">${esc(r.detalle)}</td>
+    </tr>`).join('');
+}
+
+// ════════════════════════════════════════════════════
+//  ═══ ELIMINAR ═══
+// ════════════════════════════════════════════════════
+let _deleteId = null;
+
+function confirmarEliminar(id, desc) {
+  _deleteId = id;
+  document.getElementById('confirmMsg').textContent = `¿Eliminar "${desc}"? Esta acción no se puede deshacer.`;
+  document.getElementById('modalConfirm').classList.add('open');
+}
+
+async function ejecutarEliminar() {
+  const db = getClient(); if (!db || !_deleteId) return;
+  cerrarModal('modalConfirm');
+
+  let table = 'registros';
+  let realId = _deleteId;
+  if (_deleteId.endsWith('_emp'))   { table = 'empleados';   realId = _deleteId.replace('_emp',''); }
+  if (_deleteId.endsWith('_prod'))  { table = 'produccion';  realId = _deleteId.replace('_prod',''); }
+  if (_deleteId.endsWith('_noreg')) { table = 'noregistrar'; realId = _deleteId.replace('_noreg',''); }
+
+  const { error } = await db.from(table).delete().eq('id', realId);
+  if (error) { toast('Error: '+error.message,'error'); return; }
+
+  toast('🗑 Eliminado correctamente');
+  _deleteId = null;
+  const refreshers = { registros: loadRegistros, empleados: loadEmpleados, produccion: loadProduccion, noregistrar: loadNoRegistrar };
+  if (refreshers[table]) refreshers[table]();
+  loadCounts();
+}
+
+// ════════════════════════════════════════════════════
+//  ═══ IMPORTAR ═══
+// ════════════════════════════════════════════════════
+let _importData = null;
+
+function handleFileSelect(e) {
+  const file = e.target.files[0];
+  if (file) procesarArchivo(file);
+}
+
+function handleFileDrop(e) {
+  e.preventDefault();
+  e.currentTarget.classList.remove('drag');
+  const file = e.dataTransfer.files[0];
+  if (file) procesarArchivo(file);
+}
+
+function procesarArchivo(file) {
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      _importData = JSON.parse(e.target.result);
+      document.getElementById('importPreview').style.display = 'block';
+      document.getElementById('importInfo').innerHTML = `
+        <strong>Archivo:</strong> ${esc(file.name)}<br>
+        <strong>Registros:</strong> ${_importData.length}<br>
+        <strong>Tabla destino:</strong> ${document.getElementById('importTabla').value}<br>
+        <strong>Vista previa:</strong> ${Object.keys(_importData[0] || {}).join(', ')}
+      `;
+    } catch(err) {
+      toast('Error al leer el archivo JSON: '+err.message,'error');
+    }
+  };
+  reader.readAsText(file);
+}
+
+async function ejecutarImport() {
+  const db = getClient(); if (!db || !_importData) return;
+  const tabla = document.getElementById('importTabla').value;
+  const btn = document.getElementById('btnImportar');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>Importando…';
+
+  let ok = 0, err = 0;
+  const CHUNK = 100;
+  for (let i = 0; i < _importData.length; i += CHUNK) {
+    const chunk = _importData.slice(i, i + CHUNK);
+    const { error } = await db.from(tabla).upsert(chunk, { onConflict: 'id', ignoreDuplicates: true });
+    if (error) { err += chunk.length; console.error(error); }
+    else ok += chunk.length;
+    btn.innerHTML = `<span class="spinner"></span>Importando ${i+CHUNK}/${_importData.length}…`;
+  }
+
+  btn.disabled = false;
+  btn.innerHTML = '📥 Importar todos los registros';
+  toast(`✅ Importados: ${ok} | Errores: ${err}`, ok > 0 ? 'success' : 'error', 5000);
+  loadCounts();
+}
+
+async function ejecutarSQL() {
+  const db = getClient(); if (!db) return;
+  const sql = document.getElementById('sqlInput').value.trim();
+  if (!sql) { toast('Pega el SQL primero','warn'); return; }
+
+  toast('⏳ Ejecutando SQL…','info');
+  const { error } = await db.rpc('exec_sql', { sql_query: sql }).catch(() => ({ error: { message: 'RPC no disponible — usa el SQL Editor de Supabase directamente.' }}));
+  if (error) {
+    toast('Usa el SQL Editor de Supabase directamente para ejecutar SQL masivo','warn',5000);
+  } else {
+    toast('✅ SQL ejecutado');
+  }
+}
+
+// ════════════════════════════════════════════════════
+//  ═══ EXPORTAR ═══
+// ════════════════════════════════════════════════════
+async function exportarTabla(tabla, formato) {
+  const db = getClient(); if (!db) return;
+  toast('⏳ Descargando '+tabla+'…','info');
+
+  const { data, error } = await db.from(tabla).select('*').order('created_at',{ascending:false});
+  if (error) { toast('Error: '+error.message,'error'); return; }
+
+  let content, mime, ext;
+  if (formato === 'json') {
+    content = JSON.stringify(data, null, 2);
+    mime = 'application/json'; ext = 'json';
+  } else {
+    if (!data.length) { toast('Sin datos','warn'); return; }
+    const cols = Object.keys(data[0]);
+    const rows = data.map(r => cols.map(c => {
+      const v = String(r[c] ?? '').replace(/"/g,'""');
+      return `"${v}"`;
+    }).join(','));
+    content = [cols.join(','), ...rows].join('\n');
+    mime = 'text/csv'; ext = 'csv';
+  }
+
+  const blob = new Blob([content], { type: mime });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `${tabla}_${new Date().toISOString().substring(0,10)}.${ext}`;
+  a.click();
+  toast(`✅ Descargado: ${tabla}.${ext}`);
+}
+
+// ════════════════════════════════════════════════════
+//  ═══ PAGINATION ═══
+// ════════════════════════════════════════════════════
+function renderPagination(containerId, total, current, perPage, onPage) {
+  const totalPages = Math.ceil(total / perPage);
+  const container = document.getElementById(containerId);
+  if (totalPages <= 1) { container.innerHTML = ''; return; }
+
+  let html = `<button class="page-btn" ${current===1?'disabled':''} onclick="(${onPage})(${current-1})">‹</button>`;
+
+  const range = [];
+  for (let i = Math.max(1, current-2); i <= Math.min(totalPages, current+2); i++) range.push(i);
+  if (range[0] > 1) html += `<button class="page-btn" onclick="(${onPage})(1)">1</button>${range[0]>2?'<span style="padding:0 4px;color:var(--hint)">…</span>':''}`;
+  range.forEach(p => {
+    html += `<button class="page-btn ${p===current?'active':''}" onclick="(${onPage})(${p})">${p}</button>`;
+  });
+  if (range[range.length-1] < totalPages) html += `${range[range.length-1]<totalPages-1?'<span style="padding:0 4px;color:var(--hint)">…</span>':''}<button class="page-btn" onclick="(${onPage})(${totalPages})">${totalPages}</button>`;
+  html += `<button class="page-btn" ${current===totalPages?'disabled':''} onclick="(${onPage})(${current+1})">›</button>`;
+  html += `<span style="font-size:11px;color:var(--muted);font-family:var(--mono);padding:0 8px">Página ${current}/${totalPages} · ${total} registros</span>`;
+  container.innerHTML = html;
+}
+
+// ════════════════════════════════════════════════════
+//  ═══ SETTINGS ═══
+// ════════════════════════════════════════════════════
+function cargarSettings() {
+  const cfg = getCfg();
+  document.getElementById('cfg-url').value  = cfg.url  ?? '';
+  document.getElementById('cfg-key').value  = cfg.key  ?? '';
+  document.getElementById('cfg-vac').value  = cfg.vac  ?? '';
+  document.getElementById('cfg-perm').value = cfg.perm ?? '';
+}
+
+function guardarConfig() {
+  const cfg = {
+    url:  document.getElementById('cfg-url').value.trim(),
+    key:  document.getElementById('cfg-key').value.trim(),
+    vac:  document.getElementById('cfg-vac').value.trim(),
+    perm: document.getElementById('cfg-perm').value.trim(),
+  };
+  if (!cfg.url || !cfg.key) { toast('URL y Anon Key son obligatorias','error'); return; }
+  saveCfg(cfg);
+  _sb = null; // resetear cliente
+  toast('✅ Configuración guardada');
+  checkConn().then(() => loadCounts());
+
+  // Actualizar también el supabase-api.js en memoria si existe
+  if (window.SUPABASE_URL !== undefined) {
+    window.SUPABASE_URL     = cfg.url;
+    window.SUPABASE_ANON_KEY = cfg.key;
+  }
+}
+
+async function probarConexion() {
+  const ok = await checkConn();
+  toast(ok ? '✅ Conexión exitosa a Supabase' : '❌ No se pudo conectar — verifica URL y Key', ok ? 'success' : 'error', 4000);
+  if (ok) loadCounts();
+}
+
+function limpiarCache() {
+  // Limpia timers de debounce
+  Object.keys(_debounceTimers).forEach(k => clearTimeout(_debounceTimers[k]));
+  toast('✅ Caché limpiada');
+}
+
+async function verStats() {
+  const db = getClient(); if (!db) return;
+  const tables = ['registros','empleados','produccion','noregistrar','audit_log'];
+  const counts = await Promise.all(tables.map(t => db.from(t).select('*',{count:'exact',head:true})));
+  const msg = tables.map((t,i) => `${t}: ${counts[i].count ?? '?'}`).join(' | ');
+  toast(msg, 'info', 6000);
+}
+
+function confirmarBorrarTodo() {
+  if (!confirm('⚠️ PELIGRO: ¿Borrar TODOS los registros de asistencia?\n\nEsta acción es IRREVERSIBLE.\n\nEscribe "BORRAR" para confirmar:')) return;
+  const r = prompt('Escribe BORRAR para confirmar:');
+  if (r !== 'BORRAR') { toast('Cancelado','warn'); return; }
+  borrarTodoRegistros();
+}
+
+async function borrarTodoRegistros() {
+  const db = getClient(); if (!db) return;
+  const { error } = await db.from('registros').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+  if (error) { toast('Error: '+error.message,'error'); return; }
+  toast('🗑 Todos los registros eliminados','warn');
+  loadCounts();
+}
+
+// ════════════════════════════════════════════════════
+//  ═══ INIT ═══
+// ════════════════════════════════════════════════════
+window.onload = async () => {
+  cargarSettings();
+  const ok = await checkConn();
+  if (ok) {
+    loadCounts();
+    loadRegistros();
+  } else {
+    // Si no hay config, ir a Settings
+    const cfg = getCfg();
+    if (!cfg.url) {
+      setTimeout(() => goPage('settings'), 300);
+      toast('⚙️ Configura la conexión a Supabase para comenzar','info', 5000);
+    }
+  }
+};
+</script>
+</body>
+</html>
