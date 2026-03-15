@@ -679,6 +679,9 @@ body {
         </div>
         <div class="page-header-actions">
           <button class="btn btn-secondary" onclick="loadProduccion()">🔄 Recargar</button>
+          <button class="btn btn-danger" id="btnEliminarSelProd" onclick="confirmarEliminarSelProd()" style="display:none">
+            🗑 Eliminar seleccionados (<span id="cntSelProd">0</span>)
+          </button>
           <button class="btn btn-primary" onclick="abrirModalProduccion()">＋ Nueva entrada</button>
         </div>
       </div>
@@ -691,6 +694,7 @@ body {
           <table class="data-table">
             <thead>
               <tr>
+                <th style="width:34px;text-align:center;padding:6px"></th>
                 <th style="width:80px">Acciones</th>
                 <th onclick="sortProd('especie')"        style="cursor:pointer;user-select:none" id="thp-especie">Especie <span id="arr-especie">↕</span></th>
                 <th onclick="sortProd('funcion')"        style="cursor:pointer;user-select:none" id="thp-funcion">Función <span id="arr-funcion">↕</span></th>
@@ -766,9 +770,9 @@ body {
             <div style="background:var(--surface3);border:1px solid var(--border);border-radius:10px;padding:14px;flex:1;min-width:220px">
               <div style="font-size:11px;font-weight:700;color:var(--accent);margin-bottom:8px;font-family:var(--mono);letter-spacing:.5px">🏭 PRODUCCIÓN</div>
               <div style="font-size:12px;color:var(--muted);line-height:1.9">
-                <code style="background:var(--surface);border:1px solid var(--border);padding:2px 7px;border-radius:4px;font-size:11px;display:block;margin-bottom:4px">especie · producto · funcion</code>
-                <code style="background:var(--surface);border:1px solid var(--border);padding:2px 7px;border-radius:4px;font-size:11px;display:block;margin-bottom:4px">proceso · operacion</code>
-                <code style="background:var(--surface);border:1px solid var(--border);padding:2px 7px;border-radius:4px;font-size:11px;display:block">responsable · linea</code>
+                <code style="background:var(--surface);border:1px solid var(--border);padding:2px 7px;border-radius:4px;font-size:11px;display:block;margin-bottom:4px">especie · funcion · producto</code>
+                <code style="background:var(--surface);border:1px solid var(--border);padding:2px 7px;border-radius:4px;font-size:11px;display:block;margin-bottom:4px">proceso · operacion · responsable</code>
+                <code style="background:var(--surface);border:1px solid var(--border);padding:2px 7px;border-radius:4px;font-size:11px;display:block">linea · linea_especial · funcion_especial</code>
               </div>
             </div>
           </div>
@@ -1582,7 +1586,7 @@ let _prodSortAsc = true;
 async function loadProduccion() {
   const db = getClient(); if (!db) return;
   const tbody = document.getElementById('tbodyProd');
-  tbody.innerHTML = '<tr class="loading-row"><td colspan="10"><span class="spinner"></span>Cargando…</td></tr>';
+  tbody.innerHTML = '<tr class="loading-row"><td colspan="11"><span class="spinner"></span>Cargando…</td></tr>';
 
   const search = document.getElementById('prodSearch').value.trim();
 
@@ -1606,12 +1610,17 @@ async function loadProduccion() {
   });
 
   if (!data?.length) {
-    tbody.innerHTML = '<tr><td colspan="10"><div class="empty-state"><div class="ei">🏭</div><p>Sin datos de producción</p></div></td></tr>';
+    tbody.innerHTML = '<tr><td colspan="11"><div class="empty-state"><div class="ei">🏭</div><p>Sin datos de producción</p></div></td></tr>';
     return;
   }
 
   tbody.innerHTML = data.map(r => `
-    <tr>
+    <tr id="prodfila-${r.id}">
+      <td style="text-align:center;padding:5px 4px">
+        <input type="checkbox" class="chk-prod" value="${r.id}"
+          onchange="actualizarSelProd()"
+          style="width:15px;height:15px;cursor:pointer;accent-color:#e05252;vertical-align:middle;appearance:none;-webkit-appearance:none;border:2px solid #c0c8d4;border-radius:4px;background:#fff;display:inline-flex;align-items:center;justify-content:center">
+      </td>
       <td>
         <div class="td-actions">
           <button class="btn btn-secondary btn-sm" onclick="editarProduccion('${r.id}')">✏️</button>
@@ -1628,6 +1637,8 @@ async function loadProduccion() {
       <td>${esc(r.linea_especial)}</td>
       <td>${esc(r.funcion_especial)}</td>
     </tr>`).join('');
+
+  actualizarSelProd();
 
   // Sin paginación — ocultar paginador
   document.getElementById('prodPagination').innerHTML = '';
@@ -1916,7 +1927,7 @@ function descargarPlantilla(tabla) {
   if (typeof XLSX === 'undefined') { toast('Librería Excel no cargada', 'error'); return; }
   var cols = {
     empleados:  [['codigo', 'nombre', 'centro_costo', 'contrato']],
-    produccion: [['especie', 'producto', 'funcion', 'proceso', 'operacion', 'responsable', 'linea', 'linea_especial', 'funcion_especial']],
+    produccion: [['especie', 'funcion', 'producto', 'proceso', 'operacion', 'responsable', 'linea', 'linea_especial', 'funcion_especial']],
   };
   var ws = XLSX.utils.aoa_to_sheet(cols[tabla]);
   ws['!cols'] = cols[tabla][0].map(function() { return { wch: 22 }; });
@@ -1932,7 +1943,7 @@ function descargarPlantilla(tabla) {
 var COLS_EXCEL = {
   registros:  ['mes','fecha','responsable','turno','linea','codigo','nombre','tipo_contrato','funcion','centro_costo','especie','producto','proceso','operacion','proceso_inicio','proceso_termino','atraso_inicio','descanso_inicio','descanso_termino','desayuno_programado','colacion_inicio','colacion_termino','colacion_programado'],
   empleados:  ['codigo','nombre','centro_costo','contrato','activo'],
-  produccion: ['especie','producto','funcion','proceso','operacion','responsable','linea','linea_especial','funcion_especial'],
+  produccion: ['especie','funcion','producto','proceso','operacion','responsable','linea','linea_especial','funcion_especial'],
 };
 
 async function _fetchParaExportar(tabla) {
@@ -2404,6 +2415,57 @@ async function ejecutarImportRegistros() {
   } else {
     toast('⚠️ '+ok+' importados, '+errCount+' con error — revisa la consola','warn',6000);
   }
+}
+
+// ════════════════════════════════════════════════════
+//  SELECCIÓN MÚLTIPLE PRODUCCIÓN
+// ════════════════════════════════════════════════════
+function actualizarSelProd() {
+  var checks   = Array.from(document.querySelectorAll('.chk-prod'));
+  var marcados = checks.filter(function(c){ return c.checked; });
+  var btn = document.getElementById('btnEliminarSelProd');
+  var cnt = document.getElementById('cntSelProd');
+  if (cnt) cnt.textContent = marcados.length;
+  if (btn) btn.style.display = marcados.length > 0 ? '' : 'none';
+  // CSS relleno rojo al marcar
+  checks.forEach(function(c){
+    c.style.background     = c.checked ? '#e05252' : '#fff';
+    c.style.borderColor    = c.checked ? '#c0392b' : '#c0c8d4';
+    var fila = document.getElementById('prodfila-' + c.value);
+    if (fila) fila.style.background = c.checked ? 'rgba(224,82,82,.06)' : '';
+  });
+}
+
+function confirmarEliminarSelProd() {
+  var ids = Array.from(document.querySelectorAll('.chk-prod:checked')).map(function(c){ return c.value; });
+  if (!ids.length) { toast('Selecciona al menos una entrada','warn'); return; }
+  window._idsEliminarProd = ids;
+  document.getElementById('confirmMsg').textContent =
+    '¿Eliminar ' + ids.length + ' entrada' + (ids.length!==1?'s':'') + ' de producción? Esta acción no se puede deshacer.';
+  document.getElementById('modalConfirm').classList.add('open');
+  document.getElementById('modalConfirm').querySelector('.btn-danger').onclick = ejecutarEliminarSelProd;
+}
+
+async function ejecutarEliminarSelProd() {
+  var db  = getClient();
+  var ids = window._idsEliminarProd || [];
+  if (!db || !ids.length) return;
+  cerrarModal('modalConfirm');
+  toast('⏳ Eliminando ' + ids.length + ' entradas…', 'info');
+  var ok = 0, errCount = 0;
+  var CHUNK = 50;
+  for (var i = 0; i < ids.length; i += CHUNK) {
+    var lote = ids.slice(i, i + CHUNK);
+    var res  = await db.from('produccion').delete().in('id', lote);
+    if (res.error) { errCount += lote.length; console.error(res.error.message); }
+    else ok += lote.length;
+  }
+  window._idsEliminarProd = [];
+  document.getElementById('modalConfirm').querySelector('.btn-danger').onclick = ejecutarEliminar;
+  if (errCount === 0) toast('🗑 ' + ok + ' entradas eliminadas', 'success', 4000);
+  else toast('⚠️ ' + ok + ' eliminadas, ' + errCount + ' con error', 'warn', 5000);
+  loadProduccion();
+  loadCounts();
 }
 
 // ════════════════════════════════════════════════════
