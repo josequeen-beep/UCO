@@ -2168,7 +2168,7 @@ body.noche-mode .modal-field input,body.noche-mode .modal-field select{color-sch
         <th onclick="sortTable(13)">Operación ↕</th>
         <th>P. Inicio</th><th>P. Término</th><th>Atraso</th>
         <th>D. Inicio</th><th>D. Término</th><th>Desayuno</th>
-        <th>C. Inicio</th><th>C. Término</th><th>Colación</th>
+        <th>C. Inicio</th><th>C. Término</th><th>Colación</th><th>Hora Envío</th>
       </tr></thead>
       <tbody id="tbodyReg">
         <tr><td colspan="26"><div class="empty-state"><div class="ei">📭</div><p>Cargando...</p></div></td></tr>
@@ -3775,6 +3775,7 @@ function renderTabla(rows){
       '<td>'+fmtDt(r[20])+'</td>'+
       '<td>'+fmtDt(r[21])+'</td>'+
       '<td>'+fmtBool(r[22])+'</td>'+
+      '<td style="font-size:11px;color:var(--t-muted,#8a9bb0);white-space:nowrap">'+fmtHoraEnvio(r[23])+'</td>'+
       '</tr>';
   }).join('');
 
@@ -5200,12 +5201,26 @@ async function exportarRegistrosExcel(){
     {k:'colacion_inicio',   label:'Colación Inicio'},
     {k:'colacion_termino',  label:'Colación Término'},
     {k:'colacion_programado',label:'Colación Programado'},
+    {k:'created_at',          label:'Hora Envío'},
   ];
 
   function limpiarVal(k, v){
     if(v === null || v === undefined) return '';
     var s = String(v);
-    // Timestamps → formato legible
+    if(!s) return '';
+    // created_at → dd/mm/yyyy HH:MM (hora local)
+    if(k === 'created_at' && /^\d{4}-\d{2}-\d{2}T/.test(s)){
+      try {
+        var d = new Date(s);
+        var dd = String(d.getDate()).padStart(2,'0');
+        var mm = String(d.getMonth()+1).padStart(2,'0');
+        var yyyy = d.getFullYear();
+        var hh = String(d.getHours()).padStart(2,'0');
+        var mi = String(d.getMinutes()).padStart(2,'0');
+        return dd+'/'+mm+'/'+yyyy+' '+hh+':'+mi;
+      } catch(e2){ return s.replace('T',' ').substring(0,16); }
+    }
+    // Otros timestamps → yyyy-MM-dd HH:MM
     if(/^\d{4}-\d{2}-\d{2}T/.test(s)) return s.replace('T',' ').substring(0,16);
     return s;
   }
@@ -5238,6 +5253,19 @@ async function exportarRegistrosExcel(){
 
   XLSX.writeFile(wb, 'registros'+sufijo+'.xlsx');
   showToast('✅ '+data.length+' registros → registros'+sufijo+'.xlsx','success',5000);
+}
+
+// Hora de envío — formatea created_at como dd/mm HH:MM
+function fmtHoraEnvio(v){
+  if(!v||v===''||v==='—') return '—';
+  try{
+    var d=new Date(v);
+    var dd=String(d.getDate()).padStart(2,'0');
+    var mm=String(d.getMonth()+1).padStart(2,'0');
+    var h=String(d.getHours()).padStart(2,'0');
+    var mi=String(d.getMinutes()).padStart(2,'0');
+    return dd+'/'+mm+' '+h+':'+mi;
+  }catch(e){ return '—'; }
 }
 
 window.onload=function(){
