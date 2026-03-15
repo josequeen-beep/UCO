@@ -679,6 +679,7 @@ body {
         </div>
         <div class="page-header-actions">
           <button class="btn btn-secondary" onclick="loadProduccion()">🔄 Recargar</button>
+          <button class="btn btn-secondary" id="btnSelTodoProd" onclick="seleccionarTodoProd()">☑ Seleccionar todo</button>
           <button class="btn btn-danger" id="btnEliminarSelProd" onclick="confirmarEliminarSelProd()" style="display:none">
             🗑 Eliminar seleccionados (<span id="cntSelProd">0</span>)
           </button>
@@ -690,8 +691,8 @@ body {
           <input class="search-input" id="prodSearch" placeholder="🔍 Buscar especie, producto, responsable..." oninput="debounceProd()">
           <span class="count-badge" id="prodCountBadge">— entradas</span>
         </div>
-        <div class="data-table-wrap">
-          <table class="data-table">
+        <div class="data-table-wrap" style="overflow-x:auto">
+          <table class="data-table" style="min-width:1200px">
             <thead>
               <tr>
                 <th style="width:34px;text-align:center;padding:6px"></th>
@@ -1811,11 +1812,19 @@ var COLUMNAS_TABLA = {
     'tipo_contrato': 'contrato', 'tipo contrato': 'contrato', 'activo': 'activo',
   },
   produccion: {
-    'especie': 'especie', 'producto': 'producto',
+    'especie': 'especie',
+    'producto': 'producto',
     'funcion': 'funcion', 'función': 'funcion',
-    'proceso': 'proceso', 'operacion': 'operacion', 'operación': 'operacion',
-    'responsable': 'responsable', 'linea': 'linea', 'línea': 'linea',
-    'linea_especial': 'linea_especial', 'funcion_especial': 'funcion_especial',
+    'proceso': 'proceso',
+    'operacion': 'operacion', 'operación': 'operacion',
+    'responsable': 'responsable',
+    'linea': 'linea', 'línea': 'linea', 'línea': 'linea',
+    'linea_especial': 'linea_especial', 'línea especial': 'linea_especial',
+    'linea especial': 'linea_especial', 'lineaespecial': 'linea_especial',
+    'funcion_especial': 'funcion_especial', 'función especial': 'funcion_especial',
+    'funcion especial': 'funcion_especial', 'funcionespecial': 'funcion_especial',
+    'función_especial': 'funcion_especial',
+    'activo': 'activo',
   },
 };
 
@@ -1936,7 +1945,15 @@ async function ejecutarImport() {
       return r;
     });
 
-    var result = await db.from(tabla).insert(chunkLimpio);
+    // Usar upsert para ignorar duplicados
+    var onConflictCol = tabla === 'empleados' ? 'codigo' : null;
+    var result;
+    if (onConflictCol) {
+      result = await db.from(tabla).upsert(chunkLimpio, { onConflict: onConflictCol, ignoreDuplicates: true });
+    } else {
+      // produccion: insertar ignorando errores de duplicados
+      result = await db.from(tabla).insert(chunkLimpio);
+    }
     if (result.error) {
       errCount += chunk.length;
       errMsg = result.error.message;
@@ -2475,6 +2492,15 @@ async function ejecutarImportRegistros() {
 // ════════════════════════════════════════════════════
 //  SELECCIÓN MÚLTIPLE PRODUCCIÓN
 // ════════════════════════════════════════════════════
+function seleccionarTodoProd() {
+  var checks = Array.from(document.querySelectorAll('.chk-prod'));
+  var todosChecked = checks.every(function(c){ return c.checked; });
+  checks.forEach(function(c){ c.checked = !todosChecked; });
+  var btn = document.getElementById('btnSelTodoProd');
+  if (btn) btn.textContent = todosChecked ? '☑ Seleccionar todo' : '☐ Deseleccionar todo';
+  actualizarSelProd();
+}
+
 function actualizarSelProd() {
   var checks   = Array.from(document.querySelectorAll('.chk-prod'));
   var marcados = checks.filter(function(c){ return c.checked; });
