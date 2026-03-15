@@ -1912,19 +1912,27 @@ async function ejecutarImport() {
   for (var i = 0; i < _importData.length; i += CHUNK) {
     var chunk = _importData.slice(i, i + CHUNK);
 
-    // Limpiar campos vacíos para que Supabase use sus defaults
+    // Columnas válidas por tabla — ignorar columnas desconocidas o vacías del Excel
+    var COLS_VALIDAS = {
+      empleados:  ['codigo','nombre','centro_costo','contrato','activo'],
+      produccion: ['especie','funcion','producto','proceso','operacion','responsable','linea','linea_especial','funcion_especial','activo'],
+    };
+    var colsValidas = COLS_VALIDAS[tabla] || null;
+
     var chunkLimpio = chunk.map(function(row) {
       var r = {};
       Object.keys(row).forEach(function(k) {
-        // No enviar campo id — lo genera Supabase automáticamente
+        // Ignorar campos del sistema
         if (k === 'id' || k === 'created_at' || k === 'updated_at') return;
-        // No enviar campos vacíos en tablas con NOT NULL que tienen default
-        if (row[k] !== '' && row[k] !== null && row[k] !== undefined) {
-          r[k] = row[k];
-        } else {
-          r[k] = row[k]; // mantener vacíos — la tabla lo maneja
-        }
+        // Ignorar columnas vacías o con nombre inválido (ej: _empty, __EMPTY)
+        if (!k || k.startsWith('_') || k.startsWith('__')) return;
+        // Si hay lista de columnas válidas, solo enviar esas
+        if (colsValidas && !colsValidas.includes(k)) return;
+        r[k] = (row[k] === null || row[k] === undefined) ? '' : row[k];
       });
+      // Valor por defecto para activo en produccion
+      if (tabla === 'produccion' && !('activo' in r)) r.activo = true;
+      if (tabla === 'empleados'  && !('activo' in r)) r.activo = true;
       return r;
     });
 
@@ -2431,11 +2439,17 @@ async function ejecutarImportRegistros() {
   var ok = 0, errCount = 0;
   var CHUNK = 50;
   for (var i = 0; i < _importRegData.length; i += CHUNK) {
+    var COLS_REG = ['mes','fecha','responsable','turno','linea','codigo','nombre',
+      'tipo_contrato','funcion','centro_costo','especie','producto','proceso','operacion',
+      'proceso_inicio','proceso_termino','atraso_inicio','descanso_inicio','descanso_termino',
+      'desayuno_programado','colacion_inicio','colacion_termino','colacion_programado'];
     var chunk = _importRegData.slice(i, i+CHUNK).map(function(row){
       var r = {};
       Object.keys(row).forEach(function(k){
         if(k==='id'||k==='created_at'||k==='updated_at') return;
-        r[k] = row[k];
+        if(!k||k.startsWith('_')||k.startsWith('__')) return;
+        if(!COLS_REG.includes(k)) return;
+        r[k] = (row[k]===null||row[k]===undefined) ? '' : row[k];
       });
       return r;
     });
