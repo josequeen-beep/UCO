@@ -2168,7 +2168,7 @@ body.noche-mode .modal-field input,body.noche-mode .modal-field select{color-sch
         <th onclick="sortTable(13)">Operación ↕</th>
         <th>P. Inicio</th><th>P. Término</th><th>Atraso</th>
         <th>D. Inicio</th><th>D. Término</th><th>Desayuno</th>
-        <th>C. Inicio</th><th>C. Término</th><th>Colación</th><th>Hora Envío</th>
+        <th>C. Inicio</th><th>C. Término</th><th>Colación</th><th>Hora de Registro</th>
       </tr></thead>
       <tbody id="tbodyReg">
         <tr><td colspan="26"><div class="empty-state"><div class="ei">📭</div><p>Cargando...</p></div></td></tr>
@@ -5146,7 +5146,7 @@ async function exportarRegistrosExcel(){
   showToast('⏳ Preparando Excel con todos los registros del filtro…','info',3000);
 
   // Traer TODOS los registros del filtro actual desde Supabase (sin paginación)
-  var db = window._sbClient || null;
+  var db = (typeof _sbDb === 'function') ? _sbDb() : null;
   var data = [];
 
   if(db){
@@ -5169,7 +5169,8 @@ async function exportarRegistrosExcel(){
         especie:r[10],producto:r[11],proceso:r[12],operacion:r[13],
         proceso_inicio:r[14],proceso_termino:r[15],atraso_inicio:r[16],
         descanso_inicio:r[17],descanso_termino:r[18],desayuno_programado:r[19],
-        colacion_inicio:r[20],colacion_termino:r[21],colacion_programado:r[22]
+        colacion_inicio:r[20],colacion_termino:r[21],colacion_programado:r[22],
+        created_at:r[23]
       };
     });
   }
@@ -5201,7 +5202,7 @@ async function exportarRegistrosExcel(){
     {k:'colacion_inicio',   label:'Colación Inicio'},
     {k:'colacion_termino',  label:'Colación Término'},
     {k:'colacion_programado',label:'Colación Programado'},
-    {k:'created_at',          label:'Hora Envío'},
+    {k:'created_at',          label:'Hora de Registro'},
   ];
 
   function limpiarVal(k, v){
