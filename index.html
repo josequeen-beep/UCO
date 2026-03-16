@@ -346,6 +346,15 @@ async function obtenerEstadisticas(){
 }
 
 // ════════════════════════════════════════════════════════════════
+//  CACHÉ — invalidar y limpiar
+// ════════════════════════════════════════════════════════════════
+function invalidarCache(){
+  _cDelPfx('ld_v'); _cDelPfx('emp_v'); _cDel('ext_vac');
+  _cDelPfx('ext_perm_'); _cDelPfx('sem_');
+}
+function limpiarCache(){ invalidarCache(); return _ok(null,'✅ Caché limpiado.'); }
+
+// ════════════════════════════════════════════════════════════════
 //  POLYFILL google.script.run
 //  Se instala INMEDIATAMENTE — antes de window.onload
 // ════════════════════════════════════════════════════════════════
