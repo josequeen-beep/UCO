@@ -333,9 +333,17 @@ async function obtenerAusentesDia(fechaStr){
       !nrC.has(e.codigo.toLowerCase())&&!nrN.has(e.nombre.toLowerCase())
     );
 
-    // 3. Registros del día
-    const {data:regsHoy}=await db.from('registros').select('codigo').eq('fecha',fechaStr);
-    const conReg=new Set((regsHoy||[]).map(r=>r.codigo));
+    // 3. Registros del día — paginado para superar límite de 1000 de Supabase
+    let regsHoyAll=[], regPage=0, regHasMore=true;
+    while(regHasMore){
+      const ini=regPage*1000;
+      const {data:regsHoy,error:regsErr}=await db.from('registros')
+        .select('codigo').eq('fecha',fechaStr).range(ini,ini+999);
+      if(regsErr||!regsHoy||regsHoy.length===0){ regHasMore=false; break; }
+      regsHoyAll=regsHoyAll.concat(regsHoy);
+      if(regsHoy.length<1000) regHasMore=false; else regPage++;
+    }
+    const conReg=new Set(regsHoyAll.map(r=>r.codigo));
 
     const ausentes=empleados.filter(e=>!conReg.has(e.codigo));
     if(!ausentes.length) return [];
