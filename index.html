@@ -77,11 +77,13 @@ function _toISO(v){
   } catch(e){ return null; }
 }
 function _fmtTs(v){
+  // Mostrar el valor RAW de Supabase sin convertir zona horaria
+  // igual que admin: String(v).replace('T',' ').substring(0,16)
   if(!v) return '';
-  try {
-    const d=new Date(v), pad=n=>String(n).padStart(2,'0');
-    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-  } catch { return ''; }
+  var s = String(v);
+  // Quitar zona horaria (+00:00 o Z) antes de mostrar
+  s = s.replace(/([+-]\d{2}:\d{2}|Z)$/, '');
+  return s.replace('T',' ').substring(0,16);
 }
 function _isoSem(d){
   const f=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));
@@ -3567,7 +3569,7 @@ function aplicarFiltros(){
 function _aplicarFiltrosServidor(pagina){
   const tbody=document.getElementById('tbodyReg');
   if(!tbody) return;
-  tbody.innerHTML='<tr><td colspan="25"><div class="empty-state"><div class="ei">⏳</div><p>Buscando...</p></div></td></tr>';
+  tbody.innerHTML='<tr><td colspan="26"><div class="empty-state"><div class="ei">⏳</div><p>Buscando...</p></div></td></tr>';
 
   const filtros = {
     desde: document.getElementById('filtroDesde').value || '',
