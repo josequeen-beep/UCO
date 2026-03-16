@@ -221,12 +221,39 @@ async function obtenerRegistrosSemana(semana,anio){
     const lun=new Date(jan4); lun.setUTCDate(jan4.getUTCDate()-day4+1+(semana-1)*7);
     const dom=new Date(lun); dom.setUTCDate(lun.getUTCDate()+6);
     const desde=lun.toISOString().slice(0,10), hasta=dom.toISOString().slice(0,10);
-    const {data,error}=await _sbDb().from('registros').select('*').gte('fecha',desde).lte('fecha',hasta)
-      .order('fecha',{ascending:false}).order('created_at',{ascending:false})
-      .limit(5000);  // Supabase default es 1000 — una semana puede tener más
-    if(error){ console.error('[SEM]',error.message); return []; }
-    const result=(data||[]).map(_row);
-    _cPut(cKey,result,300); // 5 min cache
+
+    // Traer TODOS los registros de la semana usando paginación
+    // Supabase limita a 1000 por request — paginamos hasta obtener todo
+    const PAGE = 1000;
+    let allData = [];
+    let page = 0;
+    let hasMore = true;
+
+    while(hasMore){
+      const ini = page * PAGE;
+      const {data,error} = await _sbDb().from('registros').select('*')
+        .gte('fecha',desde).lte('fecha',hasta)
+        .order('fecha',{ascending:true})
+        .order('created_at',{ascending:true})
+        .range(ini, ini + PAGE - 1);
+
+      if(error){ console.error('[SEM]',error.message); break; }
+      if(!data || data.length === 0){ hasMore = false; break; }
+      allData = allData.concat(data);
+      if(data.length < PAGE){ hasMore = false; } // última página
+      else { page++; }
+    }
+
+    // Ordenar de más reciente a más antiguo (como antes)
+    allData.sort(function(a,b){
+      if(a.fecha > b.fecha) return -1;
+      if(a.fecha < b.fecha) return 1;
+      return (b.created_at||'') > (a.created_at||'') ? 1 : -1;
+    });
+
+    console.log('[SEM] Semana '+semana+'/'+anio+': '+allData.length+' registros totales');
+    const result = allData.map(_row);
+    _cPut(cKey,result,300);
     return result;
   }catch(e){ console.error('[SEM]',e.message); return []; }
 }
@@ -4136,13 +4163,6 @@ async function cargarDashboard(){
     // Llamar directamente a la función del backend (sin pasar por polyfill)
     const rows = await obtenerRegistrosSemana(sem, year);
     todosRegistros = rows || [];
-    console.log('[Dashboard] Semana '+sem+'/'+year+': '+todosRegistros.length+' registros');
-    if(todosRegistros.length > 0){
-      // Mostrar distribución por fecha
-      var porFecha = {};
-      todosRegistros.forEach(function(r){ var f=String(r[1]||'').substring(0,10); porFecha[f]=(porFecha[f]||0)+1; });
-      console.log('[Dashboard] Por fecha:', JSON.stringify(porFecha));
-    }
   } catch(e) {
     console.error('[DASH]', e.message);
     todosRegistros = [];
