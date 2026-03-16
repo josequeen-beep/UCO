@@ -213,7 +213,8 @@ async function obtenerRegistrosSemana(semana,anio){
     const dom=new Date(lun); dom.setUTCDate(lun.getUTCDate()+6);
     const desde=lun.toISOString().slice(0,10), hasta=dom.toISOString().slice(0,10);
     const {data,error}=await _sbDb().from('registros').select('*').gte('fecha',desde).lte('fecha',hasta)
-      .order('fecha',{ascending:false}).order('created_at',{ascending:false});
+      .order('fecha',{ascending:false}).order('created_at',{ascending:false})
+      .limit(5000);  // Supabase default es 1000 — una semana puede tener más
     if(error){ console.error('[SEM]',error.message); return []; }
     const result=(data||[]).map(_row);
     _cPut(cKey,result,120);
@@ -2276,6 +2277,7 @@ body.noche-mode .modal-field input,body.noche-mode .modal-field select{color-sch
       <span class="dash-semana-label">📅 Semana Nº</span>
       <input type="number" id="dashSemana" class="dash-semana-input" min="1" max="53"
         onchange="cargarDashboard()" oninput="cargarDashboard()">
+      <input type="number" id="dashAnio" class="dash-semana-input" min="2020" max="2030" style="width:75px;text-align:center" placeholder="Año" onchange="cargarDashboard()" oninput="cargarDashboard()">
       <span class="dash-semana-rango" id="dashRango">—</span>
       <select id="filtroTurnoDash" class="dash-semana-input" style="padding:5px 10px;min-width:110px" onchange="aplicarFiltroDash()">
         <option value="">☀️🌙 Todos</option>
@@ -4108,7 +4110,9 @@ async function cargarDashboard(){
   const si=document.getElementById('dashSemana');
   const sem=parseInt(si.value)||getNumSemana(new Date());
   si.value=sem;
-  const year=new Date().getFullYear();
+  // Usar el año del input si existe, si no el año actual
+  const yearInput=document.getElementById('dashAnio');
+  const year=yearInput?parseInt(yearInput.value)||new Date().getFullYear():new Date().getFullYear();
   const {lun,dom}=getRangoSemana(year,sem);
 
   _dashDias=[];
@@ -4133,7 +4137,8 @@ async function cargarDashboard(){
 function _aplicarFiltroDashLocal(){
   const si   = document.getElementById('dashSemana');
   const sem  = parseInt(si.value)||getNumSemana(new Date());
-  const year = new Date().getFullYear();
+  const yearInput=document.getElementById('dashAnio');
+  const year=yearInput?parseInt(yearInput.value)||new Date().getFullYear():new Date().getFullYear();
   const {lun, dom} = getRangoSemana(year, sem);
   const desde = localDate(lun), hasta = localDate(dom);
 
@@ -5311,6 +5316,8 @@ window.onload=function(){
   document.getElementById('filtroHasta').value     = hoy;
   document.getElementById('filtroHastaHora').value = '18:00';
   document.getElementById('dashSemana').value = getNumSemana(new Date());
+  const dashAnioEl = document.getElementById('dashAnio');
+  if(dashAnioEl) dashAnioEl.value = new Date().getFullYear();
   document.getElementById('ausentesFecha').value = hoy;
 
   irA('inicio');
