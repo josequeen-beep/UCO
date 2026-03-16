@@ -601,26 +601,40 @@ body {
           <button class="btn btn-secondary btn-sm" onclick="clearRegFiltros()">✕ Limpiar</button>
           <span class="count-badge" id="regCountBadge">— registros</span>
         </div>
-        <div class="data-table-wrap">
-          <table class="data-table">
+        <div class="data-table-wrap" style="overflow-x:auto">
+          <table class="data-table" style="min-width:2200px">
             <thead>
               <tr>
-                <th style="width:36px;text-align:center">
+                <th style="width:36px;text-align:center;padding:6px">
                   <input type="checkbox" id="chkTodos" title="Seleccionar todos"
                     onchange="toggleTodos(this.checked)"
                     style="width:15px;height:15px;cursor:pointer;accent-color:var(--danger)">
                 </th>
-                <th style="width:80px">Acciones</th>
-                <th>Fecha</th>
-                <th>Código</th>
-                <th>Nombre</th>
-                <th>Turno</th>
-                <th>Línea</th>
-                <th>Responsable</th>
-                <th>Especie</th>
-                <th>Proceso</th>
-                <th>Centro Costo</th>
-                <th>Hora Envío</th>
+                <th style="width:80px;white-space:nowrap">Acciones</th>
+                <th style="white-space:nowrap">Mes</th>
+                <th style="white-space:nowrap">Fecha</th>
+                <th style="white-space:nowrap">Responsable</th>
+                <th style="white-space:nowrap">Turno</th>
+                <th style="white-space:nowrap">Línea</th>
+                <th style="white-space:nowrap">Código</th>
+                <th style="white-space:nowrap">Nombre</th>
+                <th style="white-space:nowrap">Tipo Contrato</th>
+                <th style="white-space:nowrap">Función</th>
+                <th style="white-space:nowrap">Centro Costo</th>
+                <th style="white-space:nowrap">Especie</th>
+                <th style="white-space:nowrap">Producto</th>
+                <th style="white-space:nowrap">Proceso</th>
+                <th style="white-space:nowrap">Operación</th>
+                <th style="white-space:nowrap">P. Inicio</th>
+                <th style="white-space:nowrap">P. Término</th>
+                <th style="white-space:nowrap">Atraso (min)</th>
+                <th style="white-space:nowrap">D. Inicio</th>
+                <th style="white-space:nowrap">D. Término</th>
+                <th style="white-space:nowrap">Desayuno</th>
+                <th style="white-space:nowrap">C. Inicio</th>
+                <th style="white-space:nowrap">C. Término</th>
+                <th style="white-space:nowrap">Colación</th>
+                <th style="white-space:nowrap">Hora Registro</th>
               </tr>
             </thead>
             <tbody id="tbodyReg">
@@ -989,8 +1003,7 @@ body {
       <div style="background:var(--surface3);border:1px solid var(--border);border-radius:9px;padding:14px;margin-bottom:16px;font-size:12px;color:var(--muted);line-height:1.8">
         <strong style="color:var(--text);font-size:13px">Encabezados requeridos en el archivo Excel:</strong><br>
         <code style="background:var(--surface);border:1px solid var(--border);padding:2px 7px;border-radius:4px;font-size:11px">
-          fecha · responsable · turno · linea · codigo · nombre · tipo_contrato · funcion · centro_costo · especie · producto · proceso · operacion
-        </code><br><br>
+          mes · fecha · responsable · turno · linea · codigo · nombre · tipo_contrato · funcion · centro_costo · especie · producto · proceso · operacion · proceso_inicio · proceso_termino · atraso_inicio · descanso_inicio · descanso_termino · desayuno_programado · colacion_inicio · colacion_termino · colacion_programado</code><br><br>
         Las columnas de horarios son opcionales:<br>
         <code style="background:var(--surface);border:1px solid var(--border);padding:2px 7px;border-radius:4px;font-size:11px">
           proceso_inicio · proceso_termino · atraso_inicio · descanso_inicio · descanso_termino · desayuno_programado · colacion_inicio · colacion_termino · colacion_programado
@@ -1319,7 +1332,7 @@ async function loadRegistros() {
   if (!db) { toast('Configura la conexión Supabase primero','error'); return; }
 
   const tbody = document.getElementById('tbodyReg');
-  tbody.innerHTML = '<tr class="loading-row"><td colspan="12"><span class="spinner"></span>Cargando…</td></tr>';
+  tbody.innerHTML = '<tr class="loading-row"><td colspan="27"><span class="spinner"></span>Cargando…</td></tr>';
 
   const search = document.getElementById('regSearch').value.trim();
   const turno  = document.getElementById('regTurno').value;
@@ -1342,7 +1355,7 @@ async function loadRegistros() {
   renderRegStats(count);
 
   if (!data?.length) {
-    tbody.innerHTML = '<tr><td colspan="12"><div class="empty-state"><div class="ei">🔍</div><p>Sin resultados</p></div></td></tr>';
+    tbody.innerHTML = '<tr><td colspan="27"><div class="empty-state"><div class="ei">🔍</div><p>Sin resultados</p></div></td></tr>';
     return;
   }
 
@@ -1351,10 +1364,10 @@ async function loadRegistros() {
 
   tbody.innerHTML = data.map(r => `
     <tr id="fila-${r.id}">
-      <td style="text-align:center;padding:6px">
+      <td style="text-align:center;padding:5px 4px">
         <input type="checkbox" class="chk-reg" value="${r.id}"
           onchange="actualizarSeleccion()"
-          style="width:15px;height:15px;cursor:pointer;accent-color:var(--danger)">
+          style="width:15px;height:15px;cursor:pointer;accent-color:#e05252;vertical-align:middle;appearance:none;-webkit-appearance:none;border:2px solid #c0c8d4;border-radius:4px;background:#fff">
       </td>
       <td>
         <div class="td-actions">
@@ -1362,15 +1375,29 @@ async function loadRegistros() {
           <button class="btn btn-danger btn-sm" onclick="confirmarEliminar('${r.id}','Registro ${esc(r.codigo)} ${esc(r.nombre)} del ${r.fecha}')">🗑</button>
         </div>
       </td>
-      <td>${fmtFecha(r.fecha)}</td>
-      <td><strong style="font-family:var(--mono);color:var(--accent2)">${esc(r.codigo)}</strong></td>
-      <td title="${esc(r.nombre)}">${esc(r.nombre)}</td>
+      <td style="white-space:nowrap">${esc(r.mes)}</td>
+      <td style="white-space:nowrap">${fmtFecha(r.fecha)}</td>
+      <td style="white-space:nowrap">${esc(r.responsable)}</td>
       <td><span class="badge ${r.turno==='Noche'?'badge-noche':'badge-dia'}">${esc(r.turno)}</span></td>
       <td>${esc(r.linea)}</td>
-      <td>${esc(r.responsable)}</td>
-      <td>${esc(r.especie)}</td>
-      <td>${esc(r.proceso)}</td>
-      <td>${esc(r.centro_costo)}</td>
+      <td><strong style="font-family:var(--mono);color:var(--accent2)">${esc(r.codigo)}</strong></td>
+      <td title="${esc(r.nombre)}" style="min-width:180px">${esc(r.nombre)}</td>
+      <td style="white-space:nowrap">${esc(r.tipo_contrato)}</td>
+      <td style="white-space:nowrap">${esc(r.funcion)}</td>
+      <td style="white-space:nowrap">${esc(r.centro_costo)}</td>
+      <td style="white-space:nowrap">${esc(r.especie)}</td>
+      <td style="white-space:nowrap">${esc(r.producto)}</td>
+      <td style="white-space:nowrap">${esc(r.proceso)}</td>
+      <td style="white-space:nowrap">${esc(r.operacion)}</td>
+      <td style="white-space:nowrap;font-size:11px">${fmtTs(r.proceso_inicio)}</td>
+      <td style="white-space:nowrap;font-size:11px">${fmtTs(r.proceso_termino)}</td>
+      <td style="text-align:center">${esc(r.atraso_inicio)}</td>
+      <td style="white-space:nowrap;font-size:11px">${fmtTs(r.descanso_inicio)}</td>
+      <td style="white-space:nowrap;font-size:11px">${fmtTs(r.descanso_termino)}</td>
+      <td style="text-align:center">${esc(r.desayuno_programado)}</td>
+      <td style="white-space:nowrap;font-size:11px">${fmtTs(r.colacion_inicio)}</td>
+      <td style="white-space:nowrap;font-size:11px">${fmtTs(r.colacion_termino)}</td>
+      <td style="text-align:center">${esc(r.colacion_programado)}</td>
       <td style="font-family:var(--mono);font-size:11px;color:var(--muted);white-space:nowrap">${fmtHoraEnvio(r.created_at)}</td>
     </tr>`).join('');
 
