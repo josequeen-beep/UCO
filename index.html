@@ -2485,6 +2485,7 @@ function irA(pageName){
     }
   }
   if(pageName==='dashboard'){
+    // Solo recargar si no hay datos ya cargados
     cargarDashboard();
   }
 }
@@ -5301,23 +5302,7 @@ window.onload=function(){
   // Aplicar tema guardado
   aplicarTema(temaActual);
 
-  cargarListas();
-  empCargar();
-  respCargar();
-  initListenersVerde();
-
-  // Abrir IndexedDB para modo offline
-  dbAbrir().then(()=>{
-    offlineActualizarBadge();
-    // Si arrancó sin conexión, mostrar banner inmediatamente
-    if(!navigator.onLine){
-      offlineMostrarBanner('📡 Sin conexión — los registros se guardarán localmente', false);
-    } else {
-      // Si hay pendientes de sesión anterior, sincronizar al iniciar
-      dbLeerTodos().then(p=>{ if(p.length) offlineSync(); });
-    }
-  }).catch(()=>{ /* IndexedDB no disponible — continúa sin offline */ });
-
+  // Inicializar fecha/hora de filtros
   const hoy=localDate(new Date());
   document.getElementById('filtroDesde').value     = hoy;
   document.getElementById('filtroDesdeHora').value = '07:00';
@@ -5327,6 +5312,31 @@ window.onload=function(){
   document.getElementById('ausentesFecha').value = hoy;
 
   irA('inicio');
+
+  // Cargar TODOS los datos en paralelo al iniciar
+  // para que dashboard y registros estén listos cuando el usuario navegue
+  cargarListas();
+  empCargar();
+  respCargar();
+  initListenersVerde();
+
+  // Precargar dashboard y registros en segundo plano
+  setTimeout(function(){
+    // Cargar dashboard (semana actual)
+    cargarDashboard();
+    // Precargar registros del día
+    cargarRegistros();
+  }, 500); // pequeña pausa para que el DOM esté listo
+
+  // Abrir IndexedDB para modo offline
+  dbAbrir().then(()=>{
+    offlineActualizarBadge();
+    if(!navigator.onLine){
+      offlineMostrarBanner('📡 Sin conexión — los registros se guardarán localmente', false);
+    } else {
+      dbLeerTodos().then(p=>{ if(p.length) offlineSync(); });
+    }
+  }).catch(()=>{ /* IndexedDB no disponible — continúa sin offline */ });
 };
 </script>
 </body>
