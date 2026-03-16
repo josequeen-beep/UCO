@@ -162,9 +162,19 @@ async function getListData(){
 async function obtenerEmpleados(){
   const cKey='emp_v'+_SB_CONFIG.VERSION, cached=_cGet(cKey);
   if(cached) return cached;
-  const {data,error}=await _sbDb().from('empleados').select('codigo,nombre,centro_costo,contrato').eq('activo',true).order('nombre');
-  if(error){ console.error('[EMP]',error.message); return []; }
-  const result=(data||[]).map(r=>({codigo:r.codigo,nombre:r.nombre,centroCosto:r.centro_costo,contrato:r.contrato}));
+  // Paginado para superar límite 1000 de Supabase
+  let empAll=[], empPage=0, empHasMore=true;
+  while(empHasMore){
+    const ini=empPage*1000;
+    const {data,error}=await _sbDb().from('empleados')
+      .select('codigo,nombre,centro_costo,contrato').eq('activo',true)
+      .order('nombre').range(ini,ini+999);
+    if(error){ console.error('[EMP]',error.message); empHasMore=false; break; }
+    if(!data||data.length===0){ empHasMore=false; break; }
+    empAll=empAll.concat(data);
+    if(data.length<1000) empHasMore=false; else empPage++;
+  }
+  const result=empAll.map(r=>({codigo:r.codigo,nombre:r.nombre,centroCosto:r.centro_costo,contrato:r.contrato}));
   _cPut(cKey,result,_SB_CONFIG.CACHE_EMP);
   return result;
 }
@@ -372,8 +382,17 @@ async function obtenerAusentesDia(fechaStr){
         permM=new Set(permCached.medico||[]);
         permJ=new Set(permCached.judicial||[]);
       } else {
-        const {data:permData}=await db.from('permisos').select('codigo,tipo').eq('fecha',fechaStr);
-        (permData||[]).forEach(r=>{
+        // Paginado para superar límite 1000
+        let permAll=[], pPage=0, pHasMore=true;
+        while(pHasMore){
+          const pIni=pPage*1000;
+          const {data:permData}=await db.from('permisos').select('codigo,tipo')
+            .eq('fecha',fechaStr).range(pIni,pIni+999);
+          if(!permData||permData.length===0){ pHasMore=false; break; }
+          permAll=permAll.concat(permData);
+          if(permData.length<1000) pHasMore=false; else pPage++;
+        }
+        permAll.forEach(r=>{
           const t=(r.tipo||'').toLowerCase();
           if(t.includes('judicial'))    permJ.add(r.codigo);
           else if(t.includes('médico')||t.includes('medico')) permM.add(r.codigo);
