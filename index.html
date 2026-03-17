@@ -5404,47 +5404,47 @@ async function exportarRegistrosExcel(){
   var COLS_DATETIME = ['proceso_inicio','proceso_termino','descanso_inicio','descanso_termino',
                        'colacion_inicio','colacion_termino','created_at'];
 
+  // Convierte fecha/hora a número serial de Excel (timezone-safe)
+  // Excel epoch = 1899-12-30, Unix epoch = 1970-01-01 = serial 25569
+  function toExcelSerial(y, mo, d, h, mi) {
+    var ms = Date.UTC(y, mo, d, h, mi, 0);
+    return ms / 86400000 + 25569;
+  }
+
   function parsearFecha(k, v) {
     if(v === null || v === undefined || v === '') return '';
     var s = String(v).trim();
     if(!s) return '';
 
-    // Timestamps fecha+hora
+    // Timestamps fecha+hora → serial numérico Excel (sin desfase timezone)
     if(COLS_DATETIME.includes(k) && /^\d{4}-\d{2}-\d{2}[T ]/.test(s)) {
       try {
-        var pad = function(n){ return String(n).padStart(2,'0'); };
-        var dLocal;
-        // created_at tiene timezone (+00:00) → convertir a hora local primero
+        var h2, mi2, dp4;
         if(k === 'created_at') {
-          dLocal = new Date(s); // respeta timezone → da hora local
+          // created_at tiene timezone → convertir a hora LOCAL primero
+          var dLoc = new Date(s);
+          if(!isNaN(dLoc.getTime())) {
+            return toExcelSerial(dLoc.getFullYear(), dLoc.getMonth(),
+              dLoc.getDate(), dLoc.getHours(), dLoc.getMinutes());
+          }
         } else {
-          // Sin timezone → tratar como local directamente
+          // Sin timezone: parsear componentes directamente como local
           var clean = s.replace(/([+-]\d{2}:\d{2}|Z)$/,'').replace('T',' ');
           var pp = clean.split(' ');
-          var dp2 = pp[0].split('-');
-          var tp2 = (pp[1]||'00:00').split(':');
-          dLocal = { // objeto simple con hora local
-            y: parseInt(dp2[0]), mo: parseInt(dp2[1])-1, d: parseInt(dp2[2]),
-            h: parseInt(tp2[0]||0), mi: parseInt(tp2[1]||0)
-          };
-          // Crear Date UTC con valores locales → SheetJS muestra hora correcta
-          return new Date(Date.UTC(dLocal.y, dLocal.mo, dLocal.d, dLocal.h, dLocal.mi, 0));
-        }
-        // Para created_at: crear Date UTC con la hora LOCAL del usuario
-        if(!isNaN(dLocal.getTime())) {
-          return new Date(Date.UTC(
-            dLocal.getFullYear(), dLocal.getMonth(), dLocal.getDate(),
-            dLocal.getHours(), dLocal.getMinutes(), 0
-          ));
+          dp4 = pp[0].split('-');
+          var tp = (pp[1]||'00:00').split(':');
+          h2 = parseInt(tp[0]||0); mi2 = parseInt(tp[1]||0);
+          return toExcelSerial(parseInt(dp4[0]), parseInt(dp4[1])-1,
+            parseInt(dp4[2]), h2, mi2);
         }
       } catch(e){}
       return s;
     }
-    // Solo fecha "yyyy-MM-dd" → medianoche UTC (Excel mostrará fecha correcta)
+    // Solo fecha "yyyy-MM-dd" → serial de solo fecha
     if(COLS_FECHA.includes(k) && /^\d{4}-\d{2}-\d{2}$/.test(s)) {
       try {
-        var dp3 = s.split('-');
-        return new Date(Date.UTC(parseInt(dp3[0]), parseInt(dp3[1])-1, parseInt(dp3[2])));
+        var dp5 = s.split('-');
+        return toExcelSerial(parseInt(dp5[0]), parseInt(dp5[1])-1, parseInt(dp5[2]), 0, 0);
       } catch(e){ return s; }
     }
     return s;
@@ -5455,7 +5455,7 @@ async function exportarRegistrosExcel(){
     return COLS.map(function(c){ return parsearFecha(c.k, r[c.k]); });
   });
 
-  var ws = XLSX.utils.aoa_to_sheet([header].concat(filas), { cellDates: true, dateNF: 'dd-mm-yyyy hh:mm' });
+  var ws = XLSX.utils.aoa_to_sheet([header].concat(filas));
 
   // Aplicar formato de celda a columnas de fecha y datetime
   var nRows = filas.length;
@@ -5467,9 +5467,9 @@ async function exportarRegistrosExcel(){
     if(!fmt) return;
     for(var row = 2; row <= nRows + 1; row++) {
       var cellRef = colLetter + row;
-      if(ws[cellRef] && ws[cellRef].v instanceof Date) {
-        ws[cellRef].t = 'd';
-        ws[cellRef].z = fmt;
+      if(ws[cellRef] && typeof ws[cellRef].v === 'number') {
+        ws[cellRef].t = 'n'; // número
+        ws[cellRef].z = fmt; // formato fecha
       }
     }
   });
