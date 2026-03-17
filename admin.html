@@ -1318,7 +1318,7 @@ function fmtTs(v) {
   var parts = s.replace('T',' ').split(' ');
   var dp = (parts[0]||'').split('-');
   if(dp.length !== 3) return s.substring(0,16);
-  var tp = parts[1] ? parts[1].substring(0,8).replace(/^0/,'') : '';
+  var tp = parts[1] ? parts[1].substring(0,5).replace(/^0/,'') : '';
   return dp[2]+'-'+dp[1]+'-'+dp[0]+(tp?' '+tp:'');
 }
 function localToday() {
@@ -1937,9 +1937,9 @@ function procesarArchivo(file) {
   var reader = new FileReader();
   reader.onload = function(ev) {
     try {
-      var wb = XLSX.read(ev.target.result, { type: 'array', cellDates: true });
+      var wb = XLSX.read(ev.target.result, { type: 'array', cellDates: false });
       var ws = wb.Sheets[wb.SheetNames[0]];
-      var rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+      var rows = XLSX.utils.sheet_to_json(ws, { defval: '', raw: false });
 
       if (!rows.length) { toast('El archivo está vacío o no tiene datos válidos', 'error'); return; }
 
@@ -1953,7 +1953,6 @@ function procesarArchivo(file) {
           var hNorm = h.toLowerCase().trim();
           var col = mapeo[hNorm] || hNorm.replace(/\s+/g, '_');
           var val = row[h];
-          if (val instanceof Date) val = val.toISOString().substring(0, 10);
           mapped[col] = (val === undefined || val === null) ? '' : String(val).trim();
         });
         if (tabla === 'empleados' && !('activo' in mapped)) mapped.activo = true;
@@ -2416,8 +2415,7 @@ function fmtHoraEnvio(v) {
     const yyyy = d.getFullYear();
     const h  = String(d.getHours()); // sin cero inicial
     const mi = String(d.getMinutes()).padStart(2,'0');
-    const ss = String(d.getSeconds()).padStart(2,'0');
-    return dd+'-'+mm+'-'+yyyy+' '+h+':'+mi+':'+ss;
+    return dd+'-'+mm+'-'+yyyy+' '+h+':'+mi;
   } catch { return '—'; }
 }
 
@@ -2518,35 +2516,55 @@ function procesarArchivoRegistros(ev) {
   var reader = new FileReader();
   reader.onload = function(e) {
     try {
-      var wb = XLSX.read(e.target.result, { type:'array', cellDates:true });
+      // Leer con raw:false para obtener strings formateados (sin desfase UTC)
+      var wb = XLSX.read(e.target.result, { type:'array', cellDates:false });
       var ws = wb.Sheets[wb.SheetNames[0]];
-      var rows = XLSX.utils.sheet_to_json(ws, { defval:'' });
+      var rows = XLSX.utils.sheet_to_json(ws, { defval:'', raw:false });
       if (!rows.length) { toast('El archivo está vacío','error'); return; }
+
+      // Parsear múltiples formatos de fecha → "yyyy-MM-ddTHH:mm:00" o "yyyy-MM-dd"
+      function parseFechaExcel(s) {
+        if (!s) return '';
+        s = String(s).trim();
+        var pad = function(n){ return String(n).padStart(2,'0'); };
+
+        // Formato dd-MM-yyyy H:mm o dd-MM-yyyy HH:mm (exportado por la app)
+        var m = s.match(/^(\d{1,2})-(\d{2})-(\d{4})(?:[T ](\d{1,2}):(\d{2}))?/);
+        if (m) {
+          var hasTime = m[4] !== undefined;
+          if (hasTime) return m[3]+'-'+pad(m[2])+'-'+pad(m[1])+'T'+pad(m[4])+':'+pad(m[5])+':00';
+          return m[3]+'-'+pad(m[2])+'-'+pad(m[1]);
+        }
+        // Formato dd/MM/yyyy H:mm (Excel español con barras)
+        var m2 = s.match(/^(\d{1,2})\/(\d{2})\/(\d{4})(?:[T ](\d{1,2}):(\d{2}))?/);
+        if (m2) {
+          var hasTime2 = m2[4] !== undefined;
+          if (hasTime2) return m2[3]+'-'+pad(m2[2])+'-'+pad(m2[1])+'T'+pad(m2[4])+':'+pad(m2[5])+':00';
+          return m2[3]+'-'+pad(m2[2])+'-'+pad(m2[1]);
+        }
+        // Formato yyyy-MM-dd HH:mm o yyyy-MM-ddTHH:mm (ISO)
+        if (/^\d{4}-\d{2}-\d{2}/.test(s)) {
+          var iso = s.substring(0,16).replace(' ','T');
+          if (iso.length <= 10) return iso;
+          return iso + ':00';
+        }
+        return s;
+      }
+
+      var COLS_FECHA_REG = ['fecha','proceso_inicio','proceso_termino','descanso_inicio',
+        'descanso_termino','colacion_inicio','colacion_termino'];
 
       var rawHeaders = Object.keys(rows[0]);
       _importRegData = rows.map(function(row) {
         var mapped = {};
         rawHeaders.forEach(function(h) {
-          // Normalizar: minúsculas + quitar espacios extra
           var hLow  = h.toLowerCase().trim();
-          // Versión con tildes normalizadas (á→a, é→e, etc.)
           var hNorm = hLow.normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,'_');
           var col = MAPA_REG[hLow] || MAPA_REG[hNorm] || MAPA_REG[hLow.replace(/\s+/g,'_')] || hNorm;
           var val = row[h];
-          if (val instanceof Date) {
-            // Usar hora LOCAL (no UTC) para evitar desfase horario
-            var pad = function(n){ return String(n).padStart(2,'0'); };
-            var yy  = val.getFullYear();
-            var mo  = pad(val.getMonth()+1);
-            var dd  = pad(val.getDate());
-            var hh  = val.getHours();
-            var mi  = val.getMinutes();
-            var hasTime = hh !== 0 || mi !== 0;
-            if (hasTime) {
-              val = yy+'-'+mo+'-'+dd+'T'+pad(hh)+':'+pad(mi)+':00';
-            } else {
-              val = yy+'-'+mo+'-'+dd;
-            }
+          // Si es columna de fecha/hora, parsear formato dd-MM-yyyy
+          if (COLS_FECHA_REG.includes(col) && val) {
+            val = parseFechaExcel(String(val));
           }
           mapped[col] = (val===null||val===undefined) ? '' : String(val).trim();
         });
