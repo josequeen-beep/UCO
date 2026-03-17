@@ -273,19 +273,38 @@ async function obtenerRegistrosSemana(semana,anio){
 async function obtenerRegistrosFiltrados(filtros,pagina,porPagina){
   try{
     pagina=Math.max(1,parseInt(pagina)||1);
-    porPagina=Math.min(2000,parseInt(porPagina)||50);
+    const PAGE=1000; // máximo Supabase
     filtros=filtros||{};
-    let q=_sbDb().from('registros').select('*',{count:'exact'});
-    if(filtros.desde) q=q.gte('fecha',filtros.desde);
-    if(filtros.hasta) q=q.lte('fecha',filtros.hasta);
-    if(filtros.turno) q=q.ilike('turno','%'+filtros.turno+'%');
-    if(filtros.linea) q=q.ilike('linea','%'+filtros.linea+'%');
-    if(filtros.busq){const b=filtros.busq; q=q.or(`codigo.ilike.%${b}%,nombre.ilike.%${b}%,responsable.ilike.%${b}%`);}
-    const ini=(pagina-1)*porPagina;
-    q=q.order('fecha',{ascending:false}).order('created_at',{ascending:false}).range(ini,ini+porPagina-1);
-    const {data,error,count}=await q;
-    if(error) return _err('Error filtrado: '+error.message,'ERR_FILTRADO');
-    return _ok({registros:(data||[]).map(_row),total:count||0,pagina,porPagina,totalPaginas:Math.ceil((count||0)/porPagina)});
+
+    // Primero obtener el total exacto
+    let qCount=_sbDb().from('registros').select('*',{count:'exact',head:true});
+    if(filtros.desde) qCount=qCount.gte('fecha',filtros.desde);
+    if(filtros.hasta) qCount=qCount.lte('fecha',filtros.hasta);
+    if(filtros.turno) qCount=qCount.ilike('turno','%'+filtros.turno+'%');
+    if(filtros.linea) qCount=qCount.ilike('linea','%'+filtros.linea+'%');
+    if(filtros.busq){const b=filtros.busq; qCount=qCount.or(`codigo.ilike.%${b}%,nombre.ilike.%${b}%,responsable.ilike.%${b}%`);}
+    const {count}=await qCount;
+    const total=count||0;
+
+    // Traer TODOS usando paginación interna
+    let allData=[], sbPage=0, hasMore=true;
+    while(hasMore){
+      const ini=sbPage*PAGE;
+      let q=_sbDb().from('registros').select('*');
+      if(filtros.desde) q=q.gte('fecha',filtros.desde);
+      if(filtros.hasta) q=q.lte('fecha',filtros.hasta);
+      if(filtros.turno) q=q.ilike('turno','%'+filtros.turno+'%');
+      if(filtros.linea) q=q.ilike('linea','%'+filtros.linea+'%');
+      if(filtros.busq){const b=filtros.busq; q=q.or(`codigo.ilike.%${b}%,nombre.ilike.%${b}%,responsable.ilike.%${b}%`);}
+      q=q.order('fecha',{ascending:false}).order('created_at',{ascending:false}).range(ini,ini+PAGE-1);
+      const {data,error}=await q;
+      if(error){ console.error('[FILTRADO]',error.message); break; }
+      if(!data||data.length===0){ hasMore=false; break; }
+      allData=allData.concat(data);
+      if(data.length<PAGE) hasMore=false; else sbPage++;
+    }
+    console.log('[FILTRADO] Total registros traídos:',allData.length,'de',total);
+    return _ok({registros:allData.map(_row),total,pagina:1,porPagina:total,totalPaginas:1});
   }catch(e){ return _err('Error filtrado: '+e.message,'ERR_FILTRADO'); }
 }
 
@@ -3670,10 +3689,13 @@ function _aplicarFiltrosServidor(pagina){
     busq:  (document.getElementById('filtroTabla').value||'').trim(),
   };
 
-  obtenerRegistrosFiltrados(filtros, pagina, 2000).then(res=>{
+  obtenerRegistrosFiltrados(filtros, pagina, 1000).then(res=>{
     if(!res || !res.success){ renderTabla([]); return; }
     todosRegistros = res.data.registros || [];
     _registrosCargados = true;
+    // Actualizar badge con total real
+    const badge = document.getElementById('badgeRegistros');
+    if(badge) badge.textContent = (res.data.total||todosRegistros.length) + ' registros';
     renderTabla(todosRegistros);
     _actualizarPaginadorServidor(res.data, filtros, pagina);
   }).catch(e=>{
@@ -3681,10 +3703,10 @@ function _aplicarFiltrosServidor(pagina){
   });
 }
 
-function _actualizarPaginadorServidor(data, filtros, paginaActual){ return; // paginador desactivado
-  // Mostrar info de total en badge si existe
+function _actualizarPaginadorServidor(data, filtros, paginaActual){
+  // Mostrar total en badge
   const badge = document.getElementById('badgeRegistros');
-  if(badge) badge.textContent = data.total + ' registro' + (data.total!==1?'s':'');
+  if(badge) badge.textContent = (data.total||0) + ' registro' + ((data.total||0)!==1?'s':'');
 
   // Paginador simple al pie si hay múltiples páginas
   let pag = document.getElementById('paginadorReg');
