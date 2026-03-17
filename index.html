@@ -77,30 +77,20 @@ function _toISO(v){
   } catch(e){ return null; }
 }
 function _fmtTs(v){
-  // Formato: dd-MM-yyyy H:mm:ss
+  // Guardar valor RAW para que fmtDt lo formatee al mostrar
   if(!v) return '';
   var s = String(v).replace(/([+-]\d{2}:\d{2}|Z)$/, '');
-  // s = "yyyy-MM-ddTHH:mm:ss" o "yyyy-MM-dd HH:mm:ss"
-  var parts = s.replace('T',' ').split(' ');
-  var dateParts = (parts[0]||'').split('-');
-  if(dateParts.length !== 3) return s.substring(0,16);
-  var timePart = parts[1] ? parts[1].substring(0,8) : '';
-  // Quitar cero inicial de hora: "08:13:00" → "8:13:00"
-  if(timePart) timePart = timePart.replace(/^0/,'');
-  return dateParts[2]+'-'+dateParts[1]+'-'+dateParts[0]+(timePart?' '+timePart:'');
+  return s.replace('T',' ').substring(0,19); // max "yyyy-MM-dd HH:mm:ss"
 }
 function _fmtTsLocal(v){
-  // Para created_at — hora local, formato dd-MM-yyyy H:mm:ss
+  // Para created_at: guardar ISO con hora local para que fmtHoraEnvio lo formatee
   if(!v) return '';
   try{
     var d=new Date(v);
-    var dd=String(d.getDate()).padStart(2,'0');
-    var mm=String(d.getMonth()+1).padStart(2,'0');
-    var yyyy=d.getFullYear();
-    var h=String(d.getHours()); // sin cero inicial
-    var mi=String(d.getMinutes()).padStart(2,'0');
-    var ss=String(d.getSeconds()).padStart(2,'0');
-    return dd+'-'+mm+'-'+yyyy+' '+h+':'+mi+':'+ss;
+    var pad=function(n){return String(n).padStart(2,'0');};
+    // Guardar como "yyyy-MM-dd HH:mm:ss" hora local
+    return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+
+           ' '+pad(d.getHours())+':'+pad(d.getMinutes())+':'+pad(d.getSeconds());
   }catch(e){ return ''; }
 }
 function _isoSem(d){
@@ -3876,6 +3866,11 @@ function renderTabla(rows){
   const dupIcon = '<svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a7 7 0 100 14A7 7 0 008 1zm.75 4a.75.75 0 00-1.5 0v3.25l-1.5 1.5a.75.75 0 001.06 1.06l1.72-1.72A.75.75 0 008.75 8.5V5z"/></svg>';
 
   const fmtBool=v=>v==='Sí'?'<span class="badge-si">✓ Sí</span>':'<span class="badge-no">—</span>';
+  const fmtFechaSolo = v => {
+    if(!v) return '—';
+    var p = String(v).substring(0,10).split('-');
+    return p.length===3 ? p[2]+'-'+p[1]+'-'+p[0] : String(v).substring(0,10);
+  };
   const fmtDt=v=>{
     if(!v||v==='') return '—';
     var s=String(v).replace(/([+-]\d{2}:\d{2}|Z)$/,'');
@@ -4136,6 +4131,11 @@ function exportarPDF(){
     'C.Inicio','C.Término','Colación'];
 
   const x2=v=>String(v==null||v===''?'—':v).replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const fmtFechaSolo = v => {
+    if(!v) return '—';
+    var p = String(v).substring(0,10).split('-');
+    return p.length===3 ? p[2]+'-'+p[1]+'-'+p[0] : String(v).substring(0,10);
+  };
   const fmtDt=v=>{
     if(!v||v==='') return '—';
     var s=String(v).replace(/([+-]\d{2}:\d{2}|Z)$/,'');
@@ -5466,16 +5466,15 @@ async function exportarRegistrosExcel(){
 // Hora de envío — formatea created_at como dd/mm HH:MM
 function fmtHoraEnvio(v){
   if(!v||v===''||v==='—') return '—';
-  try{
-    var d=new Date(v);
-    var dd=String(d.getDate()).padStart(2,'0');
-    var mm=String(d.getMonth()+1).padStart(2,'0');
-    var yyyy=d.getFullYear();
-    var h=String(d.getHours()); // sin cero inicial
-    var mi=String(d.getMinutes()).padStart(2,'0');
-    var ss=String(d.getSeconds()).padStart(2,'0');
-    return dd+'-'+mm+'-'+yyyy+' '+h+':'+mi+':'+ss;
-  }catch(e){ return '—'; }
+  // v viene como "yyyy-MM-dd HH:mm:ss" (hora local ya convertida)
+  var s = String(v);
+  var parts = s.split(' ');
+  var dp = (parts[0]||'').split('-');
+  if(dp.length===3){
+    var tp = parts[1] ? parts[1].substring(0,8).replace(/^0/,'') : '';
+    return dp[2]+'-'+dp[1]+'-'+dp[0]+(tp?' '+tp:'');
+  }
+  return s;
 }
 
 window.onload=function(){
