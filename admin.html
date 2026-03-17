@@ -1309,11 +1309,17 @@ function esc(v) {
 }
 function fmtFecha(v) {
   if (!v) return '—';
-  return String(v).substring(0, 10);
+  var p = String(v).substring(0,10).split('-');
+  return p.length===3 ? p[2]+'-'+p[1]+'-'+p[0] : String(v).substring(0,10);
 }
 function fmtTs(v) {
   if (!v) return '—';
-  return String(v).replace('T',' ').substring(0, 16);
+  var s = String(v).replace(/([+-]\d{2}:\d{2}|Z)$/,'');
+  var parts = s.replace('T',' ').split(' ');
+  var dp = (parts[0]||'').split('-');
+  if(dp.length !== 3) return s.substring(0,16);
+  var tp = parts[1] ? parts[1].substring(0,8).replace(/^0/,'') : '';
+  return dp[2]+'-'+dp[1]+'-'+dp[0]+(tp?' '+tp:'');
 }
 function localToday() {
   const d = new Date();
@@ -2405,11 +2411,13 @@ function fmtHoraEnvio(v) {
   if (!v) return '—';
   try {
     const d = new Date(v);
-    const h = String(d.getHours()).padStart(2,'0');
-    const m = String(d.getMinutes()).padStart(2,'0');
     const dd = String(d.getDate()).padStart(2,'0');
     const mm = String(d.getMonth()+1).padStart(2,'0');
-    return dd+'/'+mm+' '+h+':'+m;
+    const yyyy = d.getFullYear();
+    const h  = String(d.getHours()); // sin cero inicial
+    const mi = String(d.getMinutes()).padStart(2,'0');
+    const ss = String(d.getSeconds()).padStart(2,'0');
+    return dd+'-'+mm+'-'+yyyy+' '+h+':'+mi+':'+ss;
   } catch { return '—'; }
 }
 
