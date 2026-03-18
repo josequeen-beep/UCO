@@ -5532,6 +5532,11 @@ async function loginIndex() {
     var res = await ac.auth.signInWithPassword({ email: email, password: pass });
     if (res.error) throw res.error;
 
+    // Establecer sesión para poder leer perfil con RLS
+    await ac.auth.setSession({
+      access_token: res.data.session.access_token,
+      refresh_token: res.data.session.refresh_token
+    });
     var perfilRes = await ac.from('usuarios')
       .select('nombre,rol,activo').eq('id', res.data.user.id).single();
 
