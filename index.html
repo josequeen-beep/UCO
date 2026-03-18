@@ -3738,16 +3738,63 @@ function cargarRegistros(){
 }
 
 async function _cargarAusenciasMap(fechaStr) {
-  // Construir mapa codigo → estado para resaltar filas
+  // Construir mapa codigo → estado SOLO para resaltar filas en Registros
+  // Usa cache existente si ya fue cargado por cargarAusenciasSemana/cargarAusentes
   try {
-    const ausentes = await obtenerAusentesDia(fechaStr);
     _ausenciasMapHoy = {};
-    (ausentes||[]).forEach(function(e) {
-      if (e.estado && e.estado !== 'Sin Registro' && e.estado !== 'Presente') {
-        _ausenciasMapHoy[String(e.codigo||'').trim().toLowerCase()] = e.estado;
+    var db = _sbDb();
+
+    // Vacaciones EN CURSO
+    var vacCached = _cGet('ext_vac');
+    var vacFechasMap = _cGet('ext_vac_fechas') || {};
+    var vacSet = new Set(vacCached || []);
+    if (!vacCached) {
+      var { data: vacData } = await db.from('vacaciones').select('codigo,fecha_inicio,fecha_fin').eq('estado','EN CURSO');
+      (vacData||[]).forEach(function(r) {
+        vacSet.add(r.codigo);
+        vacFechasMap[r.codigo] = { ini: r.fecha_inicio||'', fin: r.fecha_fin||'' };
+      });
+      _cPut('ext_vac', [...vacSet], _SB_CONFIG.CACHE_EXT);
+      _cPut('ext_vac_fechas', vacFechasMap, _SB_CONFIG.CACHE_EXT);
+    }
+
+    // Permisos del día
+    var permKey = 'ext_perm_' + fechaStr;
+    var permCached = _cGet(permKey);
+    var permP = new Set(), permM = new Set(), permJ = new Set();
+    if (permCached) {
+      permP = new Set(permCached.personal||[]);
+      permM = new Set(permCached.medico||[]);
+      permJ = new Set(permCached.judicial||[]);
+    } else {
+      var { data: permData } = await db.from('permisos').select('codigo,tipo').eq('fecha', fechaStr);
+      (permData||[]).forEach(function(r) {
+        var t = (r.tipo||'').toLowerCase();
+        if (t.includes('judicial')) permJ.add(r.codigo);
+        else if (t.includes('médico')||t.includes('medico')) permM.add(r.codigo);
+        else permP.add(r.codigo);
+      });
+      _cPut(permKey, {personal:[...permP],medico:[...permM],judicial:[...permJ]}, _SB_CONFIG.CACHE_EXT);
+    }
+
+    // Licencias médicas — desde empleados en cache
+    var empCached = _cGet('empleados') || [];
+    var licSet = new Set();
+    empCached.forEach(function(e) {
+      if (e.licenciaInicio && fechaStr >= e.licenciaInicio &&
+          (!e.licenciaFin || fechaStr <= e.licenciaFin)) {
+        licSet.add(e.codigo);
       }
     });
-  } catch(err) { _ausenciasMapHoy = {}; }
+
+    // Construir mapa final — solo empleados con estado especial
+    vacSet.forEach(function(cod) { _ausenciasMapHoy[String(cod).trim().toLowerCase()] = 'Vacaciones en curso'; });
+    licSet.forEach(function(cod) { _ausenciasMapHoy[String(cod).trim().toLowerCase()] = 'Licencia Médica'; });
+    permJ.forEach(function(cod) { _ausenciasMapHoy[String(cod).trim().toLowerCase()] = 'Permiso Judicial'; });
+    permM.forEach(function(cod) { _ausenciasMapHoy[String(cod).trim().toLowerCase()] = 'Permiso Médico'; });
+    permP.forEach(function(cod) { _ausenciasMapHoy[String(cod).trim().toLowerCase()] = 'Permiso Personal'; });
+
+  } catch(err) { console.warn('[AUS_MAP]', err.message); _ausenciasMapHoy = {}; }
 }
 
 // Timer de debounce para búsqueda
