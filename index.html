@@ -1301,6 +1301,28 @@ input.chk-reg:hover:not(:checked){ border-color:#e05252; }
 .row-duplicado{background:rgba(224,82,82,.10)!important;outline:1.5px solid rgba(224,82,82,.35)}
 .row-duplicado:hover{background:rgba(224,82,82,.17)!important}
 body.noche-mode .row-duplicado{background:rgba(255,80,80,.08)!important;outline:1.5px solid rgba(255,100,100,.3)}
+/* Resaltado por estado de ausencia */
+.row-vacacion{background:rgba(0,148,212,.08)!important;border-left:3px solid #0094d4!important}
+.row-vacacion:hover{background:rgba(0,148,212,.14)!important}
+.row-vacacion td:first-child+td+td+td{position:relative}
+.row-licencia{background:rgba(255,193,7,.10)!important;border-left:3px solid #f0b429!important}
+.row-licencia:hover{background:rgba(255,193,7,.16)!important}
+.row-perm-personal{background:rgba(39,174,96,.08)!important;border-left:3px solid #27ae60!important}
+.row-perm-personal:hover{background:rgba(39,174,96,.14)!important}
+.row-perm-medico{background:rgba(230,126,34,.09)!important;border-left:3px solid #e67e22!important}
+.row-perm-medico:hover{background:rgba(230,126,34,.15)!important}
+.row-perm-judicial{background:rgba(142,68,173,.09)!important;border-left:3px solid #8e44ad!important}
+.row-perm-judicial:hover{background:rgba(142,68,173,.15)!important}
+.ausencia-pill{
+  display:inline-flex;align-items:center;gap:4px;
+  padding:2px 7px;border-radius:20px;font-size:10px;font-weight:700;
+  white-space:nowrap;margin-left:4px;vertical-align:middle;
+}
+.pill-vac{background:rgba(0,148,212,.15);color:#0077aa}
+.pill-lic{background:rgba(255,193,7,.2);color:#a07800}
+.pill-ppers{background:rgba(39,174,96,.15);color:#1e7e49}
+.pill-pmed{background:rgba(230,126,34,.15);color:#b85c10}
+.pill-pjud{background:rgba(142,68,173,.15);color:#6c2d9e}
 .dup-badge{display:inline-flex;align-items:center;gap:4px;background:rgba(224,82,82,.15);
   color:var(--t-danger,#e05252);border:1px solid rgba(224,82,82,.3);
   border-radius:20px;font-size:10px;font-weight:700;padding:2px 8px;
@@ -3709,8 +3731,23 @@ function initFiltros(){
 function cargarRegistros(){
   const tbody=document.getElementById('tbodyReg');
   tbody.innerHTML='<tr><td colspan="25"><div class="empty-state"><div class="ei">⏳</div><p>Cargando...</p></div></td></tr>';
-  // Cargar con filtros actuales desde Supabase
+  // Cargar mapa de ausencias para el día del filtro activo
+  const fechaFiltro = document.getElementById('filtroDesde').value || localDate(new Date());
+  _cargarAusenciasMap(fechaFiltro);
   _aplicarFiltrosServidor(1);
+}
+
+async function _cargarAusenciasMap(fechaStr) {
+  // Construir mapa codigo → estado para resaltar filas
+  try {
+    const ausentes = await obtenerAusentesDia(fechaStr);
+    _ausenciasMapHoy = {};
+    (ausentes||[]).forEach(function(e) {
+      if (e.estado && e.estado !== 'Sin Registro' && e.estado !== 'Presente') {
+        _ausenciasMapHoy[String(e.codigo||'').trim().toLowerCase()] = e.estado;
+      }
+    });
+  } catch(err) { _ausenciasMapHoy = {}; }
 }
 
 // Timer de debounce para búsqueda
@@ -3824,6 +3861,8 @@ function onFiltroTurnoChange(){
 
 function aplicarFiltros(){
   const desde     = document.getElementById('filtroDesde').value;
+  // Recargar mapa de ausencias si cambió la fecha
+  if(desde) _cargarAusenciasMap(desde);
   const desdeHora = document.getElementById('filtroDesdeHora').value || '00:00';
   const hasta     = document.getElementById('filtroHasta').value;
   const hastaHora = document.getElementById('filtroHastaHora').value || '23:59';
@@ -3945,12 +3984,37 @@ function renderTabla(rows){
     const rowId=String(r[24]||'');  // UUID desde Supabase
     const tc=(r[3]||'').toLowerCase().includes('noche')?'noche':'dia';
     const {dup, porCodigo, porNombre} = esDuplicado(r);
-    const trClass = dup ? ' class="row-duplicado"' : '';
+    // Detectar estado de ausencia para esta fila
+    const codKey = String(r[5]||'').trim().toLowerCase();
+    const estadoAus = _ausenciasMapHoy[codKey] || '';
+    let ausClass = '';
+    let ausPill  = '';
+    if(estadoAus === 'Vacaciones en curso'){
+      ausClass = 'row-vacacion';
+      ausPill  = '<span class="ausencia-pill pill-vac">🏖 Vacaciones</span>';
+    } else if(estadoAus === 'Licencia Médica'){
+      ausClass = 'row-licencia';
+      ausPill  = '<span class="ausencia-pill pill-lic">🏥 Licencia</span>';
+    } else if(estadoAus === 'Permiso Personal'){
+      ausClass = 'row-perm-personal';
+      ausPill  = '<span class="ausencia-pill pill-ppers">📋 Perm. Personal</span>';
+    } else if(estadoAus === 'Permiso Médico'){
+      ausClass = 'row-perm-medico';
+      ausPill  = '<span class="ausencia-pill pill-pmed">🏥 Perm. Médico</span>';
+    } else if(estadoAus === 'Permiso Judicial'){
+      ausClass = 'row-perm-judicial';
+      ausPill  = '<span class="ausencia-pill pill-pjud">⚖️ Perm. Judicial</span>';
+    }
+    const {dup, porCodigo, porNombre} = esDuplicado(r);
+    const trClass = dup
+      ? ' class="row-duplicado' + (ausClass?' '+ausClass:'') + '"'
+      : ausClass ? ' class="'+ausClass+'"' : '';
     const motivo  = porCodigo && porNombre ? 'código y nombre'
                   : porCodigo ? 'código'
                   : porNombre ? 'nombre' : '';
     const dupCell = dup
       ? `<td title="Registro duplicado por ${motivo} en esta fecha"><span class="dup-badge">${dupIcon} Duplicado</span></td>`
+      : ausPill ? `<td>${ausPill}</td>`
       : '<td></td>';
 
     return `<tr${trClass} id="regfila-${rowId}">` +
