@@ -491,6 +491,27 @@ body {
 }
 .badge-dia    { background: rgba(255,213,80,.12); color: #d4a800; border: 1px solid rgba(255,213,80,.25); }
 .badge-noche  { background: rgba(56,189,248,.12);  color: #38bdf8; border: 1px solid rgba(56,189,248,.25); }
+.rev-card { background:var(--surface2); border:1px solid var(--border); border-radius:12px; padding:18px 20px; margin-bottom:16px; }
+.rev-tabla { width:100%; border-collapse:collapse; font-size:12px; font-family:'Calibri',sans-serif; }
+.rev-tabla th { background:var(--surface3); color:var(--muted); font-size:10px; font-weight:700; letter-spacing:.5px; padding:8px 10px; text-align:left; border-bottom:2px solid var(--border); white-space:nowrap; position:sticky; top:0; }
+.rev-tabla td { padding:7px 10px; border-bottom:1px solid var(--border); vertical-align:middle; white-space:nowrap; }
+.rev-tabla tr:hover td { background:var(--surface3); }
+.rev-tabla tr.semana-total td { background:var(--surface3); font-weight:700; font-size:11px; border-top:2px solid var(--border); }
+.rev-tabla tr.mes-total td { background:rgba(0,152,212,.08); font-weight:700; font-size:11.5px; border-top:3px solid var(--accent2); color:var(--accent2); }
+.rev-tabla tr.sin-reg td { background:rgba(224,82,82,.05); }
+.rev-tabla tr.con-licencia td { background:rgba(255,193,7,.08); }
+.rev-tabla tr.con-vacacion td { background:rgba(0,152,212,.05); }
+.rev-tabla tr.con-permiso td { background:rgba(39,174,96,.05); }
+.rev-tag { display:inline-block; padding:2px 8px; border-radius:20px; font-size:10px; font-weight:700; }
+.rev-tag-sin   { background:rgba(224,82,82,.12); color:#c0392b; }
+.rev-tag-lic   { background:rgba(255,193,7,.18); color:#a07800; }
+.rev-tag-vac   { background:rgba(0,152,212,.12); color:#0098d4; }
+.rev-tag-perm  { background:rgba(39,174,96,.12); color:#27ae60; }
+.rev-tag-ok    { background:rgba(39,174,96,.08); color:#27ae60; }
+.rev-tag-dom   { background:var(--surface3); color:var(--muted); }
+.rev-num { text-align:right; font-family:'Courier New',monospace; font-size:11px; }
+.rev-wrap { overflow-x:auto; max-height:70vh; overflow-y:auto; border:1px solid var(--border); border-radius:8px; }
+
 .badge-active   { background: rgba(62,207,142,.12); color: var(--success); border: 1px solid rgba(62,207,142,.25); }
 .badge-licencia { background: rgba(255,193,7,.18);  color: #a07800;             border: 1px solid rgba(255,193,7,.4); }
 .tr-licencia    { background: rgba(255,248,196,.55) !important; }
@@ -538,6 +559,9 @@ body {
       <button class="sidebar-item" onclick="goPage('noregistrar')">
         <span class="si-icon">🚫</span> No registrar
         <span class="si-count" id="cnt-noregistrar">—</span>
+      </button>
+      <button class="sidebar-item" onclick="goPage('revision')">
+        <span class="si-icon">📋</span> Revisión Asistencia
       </button>
     </div>
     <div class="sidebar-section">
@@ -904,6 +928,73 @@ body {
             </tbody>
           </table>
         </div>
+      </div>
+    </div>
+
+    <!-- ══ PÁGINA: REVISIÓN ASISTENCIA ══ -->
+    <div class="page" id="page-revision">
+      <div class="page-header">
+        <div>
+          <h1>📋 Revisión de Asistencia</h1>
+          <p>Detalle de días trabajados, ausencias y horas por empleado</p>
+        </div>
+        <div class="page-header-actions">
+          <button class="btn btn-secondary" onclick="exportarRevisionExcel()" id="btnExportRev" style="display:none">🟢 Exportar Excel</button>
+          <button class="btn btn-danger" onclick="exportarRevisionPDF()" id="btnExportRevPDF" style="display:none">📄 Exportar PDF</button>
+        </div>
+      </div>
+
+      <!-- Filtros búsqueda -->
+      <div class="rev-card">
+        <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end">
+          <div>
+            <label style="font-size:11px;font-weight:700;color:var(--muted);display:block;margin-bottom:4px">EMPLEADO (código o nombre)</label>
+            <input class="form-input" id="rev-busq" placeholder="Ej: M5133 o HUEQUEN SILVA..." style="width:280px"
+              oninput="revBuscarEmpleados(this.value)">
+            <div id="rev-sugerencias" style="position:absolute;background:var(--surface2);border:1px solid var(--border);border-radius:8px;z-index:100;max-height:200px;overflow-y:auto;min-width:280px;display:none"></div>
+          </div>
+          <div>
+            <label style="font-size:11px;font-weight:700;color:var(--muted);display:block;margin-bottom:4px">DESDE</label>
+            <input type="date" class="form-input" id="rev-desde" style="width:150px">
+          </div>
+          <div>
+            <label style="font-size:11px;font-weight:700;color:var(--muted);display:block;margin-bottom:4px">HASTA</label>
+            <input type="date" class="form-input" id="rev-hasta" style="width:150px">
+          </div>
+          <button class="btn btn-primary" onclick="cargarRevision()">🔍 Buscar</button>
+          <button class="btn btn-secondary" onclick="limpiarRevision()">✕ Limpiar</button>
+        </div>
+        <!-- Info empleado seleccionado -->
+        <div id="rev-emp-info" style="display:none;margin-top:14px;padding:10px 14px;background:var(--surface3);border-radius:8px;font-size:12px">
+          <strong id="rev-emp-nombre"></strong>
+          <span style="color:var(--muted);margin-left:12px" id="rev-emp-detalle"></span>
+        </div>
+      </div>
+
+      <!-- Resumen KPIs -->
+      <div id="rev-kpis" style="display:none;display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin-bottom:16px">
+        <div class="stat-card"><div class="stat-val" id="rev-k-dias">—</div><div class="stat-label">Días Trabajados</div></div>
+        <div class="stat-card"><div class="stat-val" id="rev-k-horas">—</div><div class="stat-label">Horas Totales</div></div>
+        <div class="stat-card"><div class="stat-val" id="rev-k-sinreg" style="color:#e05252">—</div><div class="stat-label">Sin Registro</div></div>
+        <div class="stat-card"><div class="stat-val" id="rev-k-licencia" style="color:#a07800">—</div><div class="stat-label">Licencia</div></div>
+        <div class="stat-card"><div class="stat-val" id="rev-k-vacacion" style="color:#0098d4">—</div><div class="stat-label">Vacaciones</div></div>
+        <div class="stat-card"><div class="stat-val" id="rev-k-permiso" style="color:#27ae60">—</div><div class="stat-label">Permisos</div></div>
+      </div>
+
+      <!-- Tabla detalle -->
+      <div id="rev-tabla-wrap" style="display:none">
+        <div class="rev-wrap" id="rev-scroll">
+          <table class="rev-tabla" id="rev-tabla">
+            <thead id="rev-thead"></thead>
+            <tbody id="rev-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Empty state -->
+      <div id="rev-empty" style="padding:48px;text-align:center;color:var(--muted)">
+        <div style="font-size:48px;margin-bottom:12px">🔍</div>
+        <div style="font-size:14px">Selecciona un empleado y rango de fechas para ver el detalle</div>
       </div>
     </div>
 
@@ -2738,6 +2829,377 @@ function toggleLicencia(val) {
     document.getElementById('ef-lic-inicio').value = '';
     document.getElementById('ef-lic-fin').value    = '';
   }
+}
+
+// ════════════════════════════════════════════════════════════════
+//  REVISIÓN DE ASISTENCIA
+// ════════════════════════════════════════════════════════════════
+var _revEmp = null;      // empleado seleccionado {id, codigo, nombre, ...}
+var _revData = [];       // filas procesadas para renderizar
+var _revBusqTimer = null;
+
+function limpiarRevision() {
+  _revEmp = null; _revData = [];
+  document.getElementById('rev-busq').value = '';
+  document.getElementById('rev-desde').value = '';
+  document.getElementById('rev-hasta').value = '';
+  document.getElementById('rev-emp-info').style.display = 'none';
+  document.getElementById('rev-kpis').style.display = 'none';
+  document.getElementById('rev-tabla-wrap').style.display = 'none';
+  document.getElementById('rev-empty').style.display = '';
+  document.getElementById('btnExportRev').style.display = 'none';
+  document.getElementById('btnExportRevPDF').style.display = 'none';
+}
+
+// Autocompletar empleado
+function revBuscarEmpleados(q) {
+  clearTimeout(_revBusqTimer);
+  var sug = document.getElementById('rev-sugerencias');
+  if (!q || q.length < 2) { sug.style.display = 'none'; return; }
+  _revBusqTimer = setTimeout(async function() {
+    var db = getClient(); if (!db) return;
+    var { data } = await db.from('empleados').select('id,codigo,nombre,centro_costo,contrato,licencia_inicio,licencia_fin')
+      .or('codigo.ilike.%'+q+'%,nombre.ilike.%'+q+'%').eq('activo', true).limit(10);
+    if (!data || !data.length) { sug.style.display = 'none'; return; }
+    sug.innerHTML = data.map(function(e) {
+      return '<div onclick="revSelEmp('+JSON.stringify(e).replace(/"/g,'&quot;')+')" style="padding:8px 12px;cursor:pointer;font-size:12px;border-bottom:1px solid var(--border)" onmouseover="this.style.background='var(--surface3)'" onmouseout="this.style.background=''">'
+        + '<strong>' + esc(e.codigo) + '</strong> — ' + esc(e.nombre)
+        + '<span style="color:var(--muted);margin-left:8px;font-size:11px">' + esc(e.centro_costo||'') + '</span>'
+        + '</div>';
+    }).join('');
+    sug.style.display = 'block';
+  }, 250);
+}
+
+function revSelEmp(e) {
+  _revEmp = e;
+  document.getElementById('rev-busq').value = e.codigo + ' — ' + e.nombre;
+  document.getElementById('rev-sugerencias').style.display = 'none';
+  document.getElementById('rev-emp-info').style.display = '';
+  document.getElementById('rev-emp-nombre').textContent = e.nombre;
+  document.getElementById('rev-emp-detalle').textContent = e.codigo + ' · ' + (e.centro_costo||'') + ' · ' + (e.contrato||'');
+}
+
+async function cargarRevision() {
+  if (!_revEmp) { toast('Selecciona un empleado primero', 'warn'); return; }
+  var desde = document.getElementById('rev-desde').value;
+  var hasta  = document.getElementById('rev-hasta').value;
+  if (!desde || !hasta) { toast('Ingresa rango de fechas', 'warn'); return; }
+
+  document.getElementById('rev-empty').style.display = 'none';
+  document.getElementById('rev-tabla-wrap').style.display = 'none';
+  document.getElementById('rev-kpis').style.display = 'none';
+  toast('⏳ Cargando datos...', 'info', 2000);
+
+  var db = getClient(); if (!db) return;
+  var codigo = _revEmp.codigo;
+
+  // 1. Traer registros del empleado en el período
+  var { data: regs } = await db.from('registros')
+    .select('*').eq('codigo', codigo).gte('fecha', desde).lte('fecha', hasta)
+    .order('fecha', {ascending:true}).order('created_at', {ascending:true});
+  regs = regs || [];
+
+  // 2. Traer vacaciones del empleado
+  var { data: vacData } = await db.from('vacaciones')
+    .select('fecha_inicio,fecha_fin').eq('codigo', codigo);
+  var vacPeriodos = vacData || [];
+
+  // 3. Traer permisos del empleado en el período
+  var { data: permData } = await db.from('permisos')
+    .select('fecha,tipo').eq('codigo', codigo).gte('fecha', desde).lte('fecha', hasta);
+  var permMap = {};
+  (permData||[]).forEach(function(p){ permMap[p.fecha] = p.tipo; });
+
+  // 4. Licencia médica del empleado
+  var licIni = _revEmp.licencia_inicio || null;
+  var licFin  = _revEmp.licencia_fin   || null;
+
+  // 5. Generar array de días
+  var dias = [];
+  var cur = new Date(desde + 'T12:00:00');
+  var end = new Date(hasta  + 'T12:00:00');
+  while (cur <= end) {
+    var fStr = cur.getFullYear()+'-'+String(cur.getMonth()+1).padStart(2,'0')+'-'+String(cur.getDate()).padStart(2,'0');
+    dias.push(fStr);
+    cur.setDate(cur.getDate() + 1);
+  }
+
+  // 6. Mapear registros por fecha
+  var regMap = {};
+  regs.forEach(function(r) {
+    if (!regMap[r.fecha]) regMap[r.fecha] = [];
+    regMap[r.fecha].push(r);
+  });
+
+  // 7. Calcular estado de cada día
+  _revData = [];
+  dias.forEach(function(fecha) {
+    var dow = new Date(fecha + 'T12:00:00').getDay(); // 0=dom,6=sab
+    var esDomingo = dow === 0;
+    var regsDia   = regMap[fecha] || [];
+    var tieneReg  = regsDia.length > 0;
+
+    // Estado
+    var estado = 'Sin Registro';
+    if (esDomingo) estado = 'Domingo';
+    else if (tieneReg) estado = 'Presente';
+    else {
+      // Licencia médica
+      if (licIni && fecha >= licIni && (!licFin || fecha <= licFin)) estado = 'Licencia Médica';
+      // Vacaciones
+      else if (vacPeriodos.some(function(v){ return fecha >= (v.fecha_inicio||'') && fecha <= (v.fecha_fin||'9999'); })) estado = 'Vacaciones';
+      // Permiso
+      else if (permMap[fecha]) estado = 'Permiso ' + permMap[fecha];
+    }
+
+    // Para días con registro: calcular horas y atraso
+    var horasTrabajadas = '—', procesoIni = '—', procesoTer = '—';
+    var descansoIni = '—', descansoTer = '—', colIni = '—', colTer = '—';
+    var atraso = '—', linea = '—', funcion2 = '—';
+
+    if (tieneReg) {
+      var r0 = regsDia[0];
+      linea    = r0.linea     || '—';
+      funcion2 = r0.funcion   || '—';
+      procesoIni = fmtTsRev(r0.proceso_inicio);
+      procesoTer = fmtTsRev(r0.proceso_termino);
+      descansoIni = fmtTsRev(r0.descanso_inicio);
+      descansoTer = fmtTsRev(r0.descanso_termino);
+      colIni = fmtTsRev(r0.colacion_inicio);
+      colTer = fmtTsRev(r0.colacion_termino);
+      atraso = r0.atraso_inicio || '0';
+
+      // Calcular horas trabajadas: proceso_termino - proceso_inicio - descanso - colacion
+      horasTrabajadas = calcHoras(r0);
+    }
+
+    _revData.push({
+      fecha, dow, estado, tieneReg,
+      linea, funcion: funcion2,
+      procesoIni, procesoTer, descansoIni, descansoTer, colIni, colTer,
+      atraso, horasTrabajadas,
+      _regs: regsDia
+    });
+  });
+
+  renderRevision();
+  document.getElementById('btnExportRev').style.display = '';
+  document.getElementById('btnExportRevPDF').style.display = '';
+}
+
+function fmtTsRev(v) {
+  if (!v) return '—';
+  var s = String(v).replace(/([+-]\d{2}:\d{2}|Z)$/,'');
+  var parts = s.replace('T',' ').split(' ');
+  if (!parts[1]) return parts[0].substring(0,10);
+  var tp = parts[1].substring(0,5).replace(/^0/,'');
+  return tp;  // solo hora HH:mm
+}
+
+function calcHoras(r) {
+  // Horas = proceso_termino - proceso_inicio - tiempo_descanso - tiempo_colacion
+  var ini = r.proceso_inicio, ter = r.proceso_termino;
+  if (!ini || !ter) return '—';
+  try {
+    var dIni = new Date(String(ini).replace(' ','T'));
+    var dTer = new Date(String(ter).replace(' ','T'));
+    var ms = dTer - dIni;
+    // Restar descanso
+    if (r.descanso_inicio && r.descanso_termino) {
+      var dD1 = new Date(String(r.descanso_inicio).replace(' ','T'));
+      var dD2 = new Date(String(r.descanso_termino).replace(' ','T'));
+      ms -= (dD2 - dD1);
+    }
+    // Restar colación
+    if (r.colacion_inicio && r.colacion_termino) {
+      var dC1 = new Date(String(r.colacion_inicio).replace(' ','T'));
+      var dC2 = new Date(String(r.colacion_termino).replace(' ','T'));
+      ms -= (dC2 - dC1);
+    }
+    if (ms < 0) ms = 0;
+    var h = Math.floor(ms / 3600000);
+    var m = Math.floor((ms % 3600000) / 60000);
+    return String(h).padStart(2,'0') + ':' + String(m).padStart(2,'0');
+  } catch(e) { return '—'; }
+}
+
+function sumarHoras(arr) {
+  var total = 0;
+  arr.forEach(function(h) {
+    if (!h || h === '—') return;
+    var p = h.split(':');
+    total += parseInt(p[0]||0)*60 + parseInt(p[1]||0);
+  });
+  var h = Math.floor(total/60), m = total%60;
+  return String(h).padStart(2,'0') + ':' + String(m).padStart(2,'0');
+}
+
+var DIAS_SEM_REV = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+var MESES_REV = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+
+function revEstadoTag(estado) {
+  if (estado === 'Presente')       return '<span class="rev-tag rev-tag-ok">✅ Presente</span>';
+  if (estado === 'Sin Registro')   return '<span class="rev-tag rev-tag-sin">⚠️ Sin Registro</span>';
+  if (estado === 'Licencia Médica') return '<span class="rev-tag rev-tag-lic">🏥 Licencia</span>';
+  if (estado === 'Vacaciones')     return '<span class="rev-tag rev-tag-vac">🏖 Vacaciones</span>';
+  if (estado === 'Domingo')        return '<span class="rev-tag rev-tag-dom">Dom</span>';
+  if (estado.startsWith('Permiso')) return '<span class="rev-tag rev-tag-perm">📋 ' + esc(estado) + '</span>';
+  return '<span class="rev-tag">' + esc(estado) + '</span>';
+}
+
+function fmtFechaRev(f) {
+  var p = f.split('-');
+  return p[2]+'-'+p[1]+'-'+p[0];
+}
+
+function renderRevision() {
+  var thead = document.getElementById('rev-thead');
+  var tbody  = document.getElementById('rev-tbody');
+  var wrap   = document.getElementById('rev-tabla-wrap');
+  var kpis   = document.getElementById('rev-kpis');
+
+  thead.innerHTML = '<tr>'
+    + '<th>Fecha</th><th>Día</th><th>Estado</th>'
+    + '<th>Línea</th><th>Función</th>'
+    + '<th class="rev-num">P. Inicio</th><th class="rev-num">P. Término</th>'
+    + '<th class="rev-num">Desc. Ini</th><th class="rev-num">Desc. Ter</th>'
+    + '<th class="rev-num">Col. Ini</th><th class="rev-num">Col. Ter</th>'
+    + '<th class="rev-num">Atraso</th><th class="rev-num">Horas</th>'
+    + '</tr>';
+
+  // Agrupar por semana y mes
+  var filas = '';
+  var semActual = null, mesActual = null;
+  var horasSem = [], horasMes = [];
+  var diasSem = {trab:0,sin:0,lic:0,vac:0,perm:0};
+  var diasMes = {trab:0,sin:0,lic:0,vac:0,perm:0};
+  var kDias=0, kHoras=[], kSin=0, kLic=0, kVac=0, kPerm=0;
+
+  function getSemana(f) {
+    var d = new Date(f+'T12:00:00');
+    var isoDay = d.getDay()||7;
+    var lun = new Date(d); lun.setDate(d.getDate()-isoDay+1);
+    return lun.toISOString().substring(0,10);
+  }
+  function getMesKey(f) { return f.substring(0,7); }
+
+  function filaTotal(label, horas, dias, cls) {
+    return '<tr class="'+cls+'">'
+      + '<td colspan="12" style="text-align:right;padding-right:16px">'+label+'</td>'
+      + '<td class="rev-num">' + sumarHoras(horas) + '</td>'
+      + '</tr>'
+      + '<tr class="'+cls+'" style="font-size:10px">'
+      + '<td colspan="13" style="padding:3px 10px;color:var(--muted)">'
+      + '✅ Trab: ' + dias.trab
+      + (dias.sin  ? ' &nbsp;⚠️ Sin reg: '+dias.sin   : '')
+      + (dias.lic  ? ' &nbsp;🏥 Lic: '   +dias.lic   : '')
+      + (dias.vac  ? ' &nbsp;🏖 Vac: '   +dias.vac   : '')
+      + (dias.perm ? ' &nbsp;📋 Perm: '  +dias.perm  : '')
+      + '</td></tr>';
+  }
+
+  _revData.forEach(function(d, i) {
+    var sem = getSemana(d.fecha);
+    var mes = getMesKey(d.fecha);
+
+    // ── Corte de mes ──
+    if (mesActual !== null && mes !== mesActual) {
+      var mesLabel = MESES_REV[parseInt(mesActual.split('-')[1])-1] + ' ' + mesActual.split('-')[0];
+      filas += filaTotal('TOTAL ' + mesLabel.toUpperCase(), horasMes, diasMes, 'mes-total');
+      horasMes = []; diasMes = {trab:0,sin:0,lic:0,vac:0,perm:0};
+    }
+    // ── Corte de semana ──
+    if (semActual !== null && sem !== semActual) {
+      filas += filaTotal('Total semana ('+fmtFechaRev(semActual)+')', horasSem, diasSem, 'semana-total');
+      horasSem = []; diasSem = {trab:0,sin:0,lic:0,vac:0,perm:0};
+    }
+    semActual = sem; mesActual = mes;
+
+    // ── Color de fila ──
+    var trCls = '';
+    if (d.estado==='Sin Registro')   trCls = 'sin-reg';
+    if (d.estado==='Licencia Médica') trCls = 'con-licencia';
+    if (d.estado==='Vacaciones')     trCls = 'con-vacacion';
+    if (d.estado.startsWith('Permiso')) trCls = 'con-permiso';
+
+    filas += '<tr class="' + trCls + '">'
+      + '<td><strong>' + fmtFechaRev(d.fecha) + '</strong></td>'
+      + '<td style="color:var(--muted)">' + DIAS_SEM_REV[d.dow] + '</td>'
+      + '<td>' + revEstadoTag(d.estado) + '</td>'
+      + '<td>' + esc(d.linea) + '</td>'
+      + '<td>' + esc(d.funcion) + '</td>'
+      + '<td class="rev-num">' + d.procesoIni + '</td>'
+      + '<td class="rev-num">' + d.procesoTer + '</td>'
+      + '<td class="rev-num">' + d.descansoIni + '</td>'
+      + '<td class="rev-num">' + d.descansoTer + '</td>'
+      + '<td class="rev-num">' + d.colIni + '</td>'
+      + '<td class="rev-num">' + d.colTer + '</td>'
+      + '<td class="rev-num" style="color:#e67e22">' + d.atraso + '</td>'
+      + '<td class="rev-num" style="font-weight:700">' + d.horasTrabajadas + '</td>'
+      + '</tr>';
+
+    // Acumular totales
+    if (d.estado === 'Presente') {
+      horasSem.push(d.horasTrabajadas); horasMes.push(d.horasTrabajadas);
+      kHoras.push(d.horasTrabajadas); kDias++; diasSem.trab++; diasMes.trab++;
+    } else if (d.estado === 'Sin Registro' && d.dow !== 0) {
+      diasSem.sin++; diasMes.sin++; kSin++;
+    } else if (d.estado === 'Licencia Médica') {
+      diasSem.lic++; diasMes.lic++; kLic++;
+    } else if (d.estado === 'Vacaciones') {
+      diasSem.vac++; diasMes.vac++; kVac++;
+    } else if (d.estado.startsWith('Permiso')) {
+      diasSem.perm++; diasMes.perm++; kPerm++;
+    }
+  });
+
+  // Totales finales
+  if (semActual) {
+    filas += filaTotal('Total semana ('+fmtFechaRev(semActual)+')', horasSem, diasSem, 'semana-total');
+  }
+  if (mesActual) {
+    var mesLabel2 = MESES_REV[parseInt(mesActual.split('-')[1])-1] + ' ' + mesActual.split('-')[0];
+    filas += filaTotal('TOTAL ' + mesLabel2.toUpperCase(), horasMes, diasMes, 'mes-total');
+  }
+
+  tbody.innerHTML = filas;
+  wrap.style.display = '';
+
+  // KPIs
+  document.getElementById('rev-k-dias').textContent    = kDias;
+  document.getElementById('rev-k-horas').textContent   = sumarHoras(kHoras);
+  document.getElementById('rev-k-sinreg').textContent  = kSin;
+  document.getElementById('rev-k-licencia').textContent = kLic;
+  document.getElementById('rev-k-vacacion').textContent = kVac;
+  document.getElementById('rev-k-permiso').textContent  = kPerm;
+  kpis.style.display = 'grid';
+}
+
+// Export Excel
+async function exportarRevisionExcel() {
+  if (!_revData.length || typeof XLSX === 'undefined') return;
+  var emp = _revEmp;
+  var DIAS = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+  var header = ['Fecha','Día','Estado','Línea','Función','P. Inicio','P. Término',
+    'Desc. Inicio','Desc. Término','Col. Inicio','Col. Término','Atraso (min)','Horas Trabajadas'];
+  var rows = [header];
+  _revData.forEach(function(d) {
+    rows.push([fmtFechaRev(d.fecha), DIAS[d.dow], d.estado, d.linea, d.funcion,
+      d.procesoIni, d.procesoTer, d.descansoIni, d.descansoTer,
+      d.colIni, d.colTer, d.atraso, d.horasTrabajadas]);
+  });
+  var ws = XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols'] = header.map(function(){ return {wch:16}; });
+  var wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Revisión');
+  XLSX.writeFile(wb, 'revision_'+esc(emp.codigo)+'_'+esc(emp.nombre.split(' ')[0])+'.xlsx');
+  toast('✅ Excel exportado', 'success', 3000);
+}
+
+function exportarRevisionPDF() {
+  toast('🔄 Generando PDF...','info',2000);
+  window.print();
 }
 
 // ════════════════════════════════════════════════════
