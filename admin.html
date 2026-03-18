@@ -3755,19 +3755,25 @@ async function guardarUsuario() {
     // Crear nuevo usuario via Supabase Auth (requiere service role — usar función edge o API admin)
     // Como usamos anon key, creamos el usuario invitándolo
     if (!pass || pass.length < 8) { toast('La contraseña debe tener al menos 8 caracteres','error'); return; }
+    // signUp con anon key — el usuario recibirá email de verificación
     var ac = getAuthClient();
     var { data: authData, error: authErr } = await ac.auth.signUp({
       email,
       password: pass,
       options: { data: { nombre, rol } }
     });
-    if (authErr) { toast('Error al crear usuario: '+authErr.message,'error'); return; }
-    // El trigger handle_new_user crea el perfil automáticamente
-    // Actualizamos el rol por si acaso
-    if (authData?.user) {
-      await db.from('usuarios').update({ nombre, rol }).eq('id', authData.user.id);
+    if (authErr) { toast('Error: '+authErr.message,'error'); return; }
+
+    // Insertar perfil manualmente (por si el trigger no disparó)
+    var userId = authData?.user?.id;
+    if (userId) {
+      await db.from('usuarios').upsert({
+        id: userId, nombre, email, rol, activo: true
+      }, { onConflict: 'id' });
+      toast('✅ Usuario creado correctamente.');
+    } else {
+      toast('⚠️ Usuario creado en Auth pero revisa la tabla usuarios manualmente.','warn',5000);
     }
-    toast('✅ Usuario creado. El usuario debe verificar su email para activarse.');
   }
 
   cerrarModal('modalUsuario');
