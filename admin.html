@@ -3678,8 +3678,8 @@ async function loadUsuarios() {
     ];
     return '<tr>'
       + '<td><div class="td-actions">'
-      + '<button class="btn btn-secondary btn-sm" onclick="editarUsuario(''+u.id+'')">✏️</button>'
-      + (!isSelf ? '<button class="btn btn-danger btn-sm" onclick="eliminarUsuario(''+u.id+'',''+esc(u.nombre)+'')">🗑</button>' : '')
+      + '<button class="btn btn-secondary btn-sm" data-uid="'+u.id+'" onclick="editarUsuario(this.dataset.uid)">✏️</button>'
+      + (!isSelf ? '<button class="btn btn-danger btn-sm" data-uid="'+u.id+'" data-nombre="'+esc(u.nombre)+'" onclick="eliminarUsuario(this.dataset.uid,this.dataset.nombre)">🗑</button>' : '')
       + '</div></td>'
       + '<td><div style="display:flex;align-items:center;gap:10px">'
       + '<div class="usr-avatar" style="background:'+avatarBg+'">'+inicial+'</div>'
