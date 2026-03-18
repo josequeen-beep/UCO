@@ -493,8 +493,8 @@ body {
 .badge-noche  { background: rgba(56,189,248,.12);  color: #38bdf8; border: 1px solid rgba(56,189,248,.25); }
 .rev-card { background:var(--surface2); border:1px solid var(--border); border-radius:12px; padding:18px 20px; margin-bottom:16px; }
 .rev-tabla { width:100%; border-collapse:collapse; font-size:12px; font-family:'Calibri',sans-serif; }
-.rev-tabla th { background:var(--surface3); color:var(--muted); font-size:10px; font-weight:700; letter-spacing:.5px; padding:8px 10px; text-align:left; border-bottom:2px solid var(--border); white-space:nowrap; position:sticky; top:0; }
-.rev-tabla td { padding:7px 10px; border-bottom:1px solid var(--border); vertical-align:middle; white-space:nowrap; }
+.rev-tabla th { background:var(--surface3); color:var(--muted); font-size:10px; font-weight:700; letter-spacing:.5px; padding:5px 8px; text-align:left; border-bottom:2px solid var(--border); white-space:nowrap; position:sticky; top:0; }
+.rev-tabla td { padding:4px 8px; border-bottom:1px solid var(--border); vertical-align:middle; white-space:nowrap; font-size:11.5px; }
 .rev-tabla tr:hover td { background:var(--surface3); }
 .rev-tabla tr.semana-total td { background:var(--surface3); font-weight:700; font-size:11px; border-top:2px solid var(--border); }
 .rev-tabla tr.mes-total td { background:rgba(0,152,212,.08); font-weight:700; font-size:11.5px; border-top:3px solid var(--accent2); color:var(--accent2); }
@@ -949,7 +949,7 @@ body {
         <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end">
           <div>
             <label style="font-size:11px;font-weight:700;color:var(--muted);display:block;margin-bottom:4px">EMPLEADO (código o nombre)</label>
-            <input class="form-input" id="rev-busq" placeholder="Ej: M5133 o HUEQUEN SILVA..." style="width:280px"
+            <input class="form-input" id="rev-busq" placeholder="Código o nombre..." style="width:280px"
               oninput="revBuscarEmpleados(this.value)">
             <div id="rev-sugerencias" style="position:absolute;background:var(--surface2);border:1px solid var(--border);border-radius:8px;z-index:100;max-height:200px;overflow-y:auto;min-width:280px;display:none"></div>
           </div>
@@ -1374,13 +1374,14 @@ function goPage(name) {
     auditlog:   loadAuditLog,
     settings:   cargarSettings,
     revision:   function() {
-      // Poner fechas por defecto: primer y último día del mes actual
-      if (!document.getElementById('rev-desde').value) {
-        var hoy = new Date();
-        var y = hoy.getFullYear(), m = String(hoy.getMonth()+1).padStart(2,'0');
-        document.getElementById('rev-desde').value = y+'-'+m+'-01';
-        document.getElementById('rev-hasta').value = hoy.toISOString().substring(0,10);
-      }
+      // Fechas por defecto: primer y último día del mes actual
+      var hoy = new Date();
+      var y = hoy.getFullYear(), mo = hoy.getMonth();
+      var primerDia = new Date(y, mo, 1);
+      var ultimoDia = new Date(y, mo+1, 0); // último día del mes
+      var pad = function(n){ return String(n).padStart(2,'0'); };
+      document.getElementById('rev-desde').value = y+'-'+pad(mo+1)+'-01';
+      document.getElementById('rev-hasta').value = y+'-'+pad(mo+1)+'-'+pad(ultimoDia.getDate());
     },
   };
   if (loaders[name]) loaders[name]();
