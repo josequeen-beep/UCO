@@ -3983,7 +3983,6 @@ function renderTabla(rows){
     const realIdx=todosRegistros.indexOf(r);
     const rowId=String(r[24]||'');  // UUID desde Supabase
     const tc=(r[3]||'').toLowerCase().includes('noche')?'noche':'dia';
-    const {dup, porCodigo, porNombre} = esDuplicado(r);
     // Detectar estado de ausencia para esta fila
     const codKey = String(r[5]||'').trim().toLowerCase();
     const estadoAus = _ausenciasMapHoy[codKey] || '';
