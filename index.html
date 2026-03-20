@@ -446,14 +446,13 @@ async function obtenerAusentesDia(fechaStr){
     // Recuperar mapa de fechas vacaciones del cache
     const vacFechasMap = vacFechasLocal || _cGet('ext_vac_fechas') || {};
 
-    return ausentes.map(e=>{
+    const resultado = ausentes.map(e=>{
       let estado='Sin registro';
       let estadoFechas={ini:'',fin:''};
       if(licSet.has(e.codigo)){
         estado='Licencia Médica';
         estadoFechas={ini:e.licenciaInicio||'',fin:e.licenciaFin||''};
       } else if(vacSet.has(e.codigo)){
-        // vacSet ya está filtrado por fecha — si está aquí, está en vacaciones
         estado='Vacaciones en curso';
         estadoFechas=vacFechasMap[e.codigo]||vacFechasLocal[e.codigo]||{ini:'',fin:''};
       } else if(permJ.has(e.codigo)) estado='Permiso Judicial';
@@ -465,6 +464,34 @@ async function obtenerAusentesDia(fechaStr){
       if(oa!==ob) return oa-ob;
       return a.nombre.localeCompare(b.nombre,'es');
     });
+
+    // ── DETECCIÓN DE CONFLICTOS: permiso/vacación + registro el mismo día ──
+    // Empleados que NO están en ausentes (tienen registro) pero SÍ tienen permiso o vacación
+    const tienePermVac = new Set([...permP,...permM,...permJ,...vacSet,...licSet]);
+    const conflictos = [];
+    regsHoyAll.forEach(r => {
+      if(tienePermVac.has(r.codigo)){
+        // Determinar tipo de conflicto
+        let tipConf = '';
+        if(licSet.has(r.codigo))       tipConf = 'Licencia Médica';
+        else if(vacSet.has(r.codigo))  tipConf = 'Vacaciones en curso';
+        else if(permJ.has(r.codigo))   tipConf = 'Permiso Judicial';
+        else if(permM.has(r.codigo))   tipConf = 'Permiso Médico';
+        else if(permP.has(r.codigo))   tipConf = 'Permiso Personal';
+        // Buscar nombre en lista de empleados
+        const emp = empleados.find(e=>e.codigo===r.codigo);
+        conflictos.push({
+          codigo: r.codigo,
+          nombre: emp ? emp.nombre : r.codigo,
+          estado: tipConf,
+          fecha:  fechaStr
+        });
+      }
+    });
+    if(conflictos.length) _conflictosSemana[fechaStr] = conflictos;
+    else delete _conflictosSemana[fechaStr];
+
+    return resultado;
   }catch(e){ console.error('[AUSENTES]',e.message); return []; }
 }
 
@@ -1137,6 +1164,52 @@ input.req-error,select.req-error{
   padding:0;transition:color .2s;white-space:nowrap;flex-shrink:0;
 }
 .emp-card-change:hover{color:var(--accent)}
+/* ── ALERTAS DE CONFLICTO registro + permiso/vacación ── */
+.conflicto-panel{
+  margin:0 0 14px 0;
+  border-radius:10px;
+  border:1.5px solid #e05252;
+  background:rgba(224,82,82,.07);
+  overflow:hidden;
+}
+.conflicto-header{
+  display:flex;align-items:center;gap:8px;
+  padding:10px 14px;
+  background:rgba(224,82,82,.13);
+  font-size:13px;font-weight:700;color:#c0392b;
+  cursor:pointer;user-select:none;
+}
+.conflicto-header span.badge-conf{
+  background:#e05252;color:#fff;
+  border-radius:20px;padding:1px 9px;font-size:12px;
+}
+.conflicto-header .conf-toggle{margin-left:auto;font-size:11px;opacity:.7}
+.conflicto-list{padding:8px 14px 12px;}
+.conflicto-item{
+  display:flex;align-items:center;gap:8px;
+  padding:5px 8px;margin:3px 0;
+  border-radius:6px;font-size:12px;
+  background:rgba(224,82,82,.06);
+  border-left:3px solid #e05252;
+}
+.conflicto-item .conf-fecha{
+  font-size:11px;color:var(--muted);
+  background:rgba(0,0,0,.06);
+  border-radius:4px;padding:1px 6px;
+  white-space:nowrap;
+}
+.conflicto-item .conf-tipo{
+  font-size:11px;font-weight:600;
+  padding:1px 7px;border-radius:10px;
+  white-space:nowrap;
+}
+.conf-tipo-vac    {background:rgba(0,152,212,.15);color:#0077a8}
+.conf-tipo-perm   {background:rgba(39,174,96,.15);color:#1e7e34}
+.conf-tipo-med    {background:rgba(230,126,34,.15);color:#b7600e}
+.conf-tipo-jud    {background:rgba(142,68,173,.15);color:#6c2e9e}
+.conf-tipo-lic    {background:rgba(255,193,7,.2);color:#7a5c00}
+.conf-tipo-sin    {background:rgba(224,82,82,.15);color:#c0392b}
+
 
 /* ── Req-error genérico ── */
 input.req-error,select.req-error{
@@ -2563,6 +2636,7 @@ body.noche-mode .modal-field input,body.noche-mode .modal-field select{color-sch
       <h4>Ausencias por Estado — Semana</h4>
       <span class="dash-card-badge" id="badgeAusenciasEstado" style="background:var(--t-warning,#e67e22)">—</span>
     </div>
+    <div id="conflictosPanel"></div>
     <div class="combo-wrap">
       <table class="combo-table" id="tablaAusenciasEstado">
         <thead id="theadAusenciasEstado"></thead>
@@ -4914,6 +4988,59 @@ let _ausentesEstado  = '';      // '' | 'Sin registro' | 'Permiso Personal' | 'P
 // ══════════════════════════════════════════
 // Datos acumulados por día de la semana actual
 let _ausenciasSemanales = {}; // fecha → {sinRegistro, permiso, vacaciones}
+let _conflictosSemana   = {}; // fecha → [{codigo,nombre,estado}]
+
+function renderConflictos(){
+  // Renderiza el panel de alertas encima de la tabla de ausencias
+  const container = document.getElementById('conflictosPanel');
+  if(!container) return;
+
+  const total = Object.values(_conflictosSemana).reduce((s,arr)=>s+arr.length,0);
+
+  if(!total){
+    container.innerHTML = '';
+    return;
+  }
+
+  // Agrupar todos los conflictos ordenados por fecha
+  const items = [];
+  Object.entries(_conflictosSemana).sort((a,b)=>a[0].localeCompare(b[0])).forEach(([fecha,arr])=>{
+    arr.forEach(c=>items.push({...c, fecha}));
+  });
+
+  const tipoClass = t => {
+    if(t==='Vacaciones en curso') return 'conf-tipo-vac';
+    if(t==='Permiso Médico')      return 'conf-tipo-med';
+    if(t==='Permiso Judicial')    return 'conf-tipo-jud';
+    if(t==='Permiso Personal')    return 'conf-tipo-perm';
+    if(t==='Licencia Médica')     return 'conf-tipo-lic';
+    return 'conf-tipo-sin';
+  };
+
+  const fmtFecha = f => {
+    if(!f) return '';
+    const [y,m,d] = f.split('-');
+    return `${d}-${m}-${y}`;
+  };
+
+  const lista = items.map(c=>`
+    <div class="conflicto-item">
+      <span style="font-weight:700;min-width:60px">${c.codigo}</span>
+      <span style="flex:1">${c.nombre}</span>
+      <span class="conf-fecha">${fmtFecha(c.fecha)}</span>
+      <span class="conf-tipo ${tipoClass(c.estado)}">${c.estado}</span>
+    </div>`).join('');
+
+  container.innerHTML = `
+    <div class="conflicto-panel">
+      <div class="conflicto-header" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'">
+        ⚠️ Conflicto: Registro + Permiso/Vacación
+        <span class="badge-conf">${total}</span>
+        <span class="conf-toggle">▼ ver detalle</span>
+      </div>
+      <div class="conflicto-list">${lista}</div>
+    </div>`;
+}
 
 function renderAusenciasEstado(){
   const dias  = _dashDias || [];
@@ -4921,6 +5048,8 @@ function renderAusenciasEstado(){
   const tbody = document.getElementById('tbodyAusenciasEstado');
   const badge = document.getElementById('badgeAusenciasEstado');
   if(!tbody) return;
+
+  renderConflictos(); // ← alertas de conflicto
 
   const hoy = localDate(new Date()); // yyyy-MM-dd
 
@@ -5003,6 +5132,7 @@ function cargarAusenciasSemana(){
   if(!dias.length) return;
 
   _ausenciasSemanales = {};
+  _conflictosSemana   = {};
   dias.forEach(d=>{ _ausenciasSemanales[d.fecha] = {sinRegistro:0, permiso:0, medico:0, judicial:0, vacaciones:0, licencia:0,
     _detalle:{sinRegistro:[], permiso:[], medico:[], judicial:[], vacaciones:[], licencia:[]}}; });
 
