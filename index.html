@@ -385,17 +385,18 @@ async function obtenerAusentesDia(fechaStr){
       // Traer todas las vacaciones y filtrar en JS por rango de fechas
       const {data:vacData}=await db.from('vacaciones')
         .select('codigo,fecha_inicio,fecha_fin');
+      console.log('[VAC] Total registros en tabla:', (vacData||[]).length);
       (vacData||[]).forEach(r=>{
         const ini = esFechaVal(r.fecha_inicio) ? r.fecha_inicio : '';
         const fin = esFechaVal(r.fecha_fin)    ? r.fecha_fin    : '';
-        // Incluir si fechaStr está dentro del rango (o si no hay fechas, excluir)
-        if(!ini && !fin) return; // sin fechas → no incluir
+        if(!ini && !fin) return;
         const enVac = (!ini || fechaStr >= ini) && (!fin || fechaStr <= fin);
         if(enVac){
           vacSet.add(r.codigo);
           vacFechasLocal[r.codigo]={ini,fin};
         }
       });
+      console.log('[VAC] En rango para '+fechaStr+':', vacSet.size);
       _cPut('ext_vac_fechas',vacFechasLocal,_SB_CONFIG.CACHE_EXT);
     }catch(e){ console.warn('[VAC]',e.message); }
 
