@@ -1484,7 +1484,11 @@ body {
       <div class="form-grid">
         <div class="form-field"><label class="form-label">Código *</label><input class="form-input" id="ef-codigo" placeholder="Ej: M6327"></div>
         <div class="form-field"><label class="form-label">Nombre completo *</label><input class="form-input" id="ef-nombre" placeholder="APELLIDO NOMBRE"></div>
-        <div class="form-field"><label class="form-label">Centro de Costo</label><input class="form-input" id="ef-cc" placeholder="Ej: 1110 -PRODUCCIÓN (FS)"></div>
+        <div class="form-field"><label class="form-label">Centro de Costo</label>
+          <select class="form-select" id="ef-cc">
+            <option value="">— Seleccionar —</option>
+          </select>
+        </div>
         <div class="form-field"><label class="form-label">Tipo Contrato</label>
           <select class="form-select" id="ef-contrato">
             <option value="">—</option><option>Indefinido</option><option>Plazo Fijo</option><option>Temporeros</option><option>Honorarios</option>
@@ -1998,12 +2002,40 @@ async function loadEmpleados() {
   renderPagination('empPagination', count, _empPage, EMP_PER_PAGE, p => { _empPage = p; loadEmpleados(); });
 }
 
-function abrirModalEmpleado(r = null) {
+// Carga los centros de costo únicos desde la tabla empleados
+let _centrosCostoCache = null;
+async function _cargarCentrosCosto() {
+  const sel = document.getElementById('ef-cc');
+  if (!sel) return;
+  // Usar caché si ya se cargaron
+  if (!_centrosCostoCache) {
+    const db = getClient(); if (!db) return;
+    const { data } = await db.from('empleados')
+      .select('centro_costo')
+      .not('centro_costo', 'is', null)
+      .neq('centro_costo', '');
+    const unicos = [...new Set((data||[])
+      .map(r => (r.centro_costo||'').trim())
+      .filter(Boolean)
+    )].sort();
+    _centrosCostoCache = unicos;
+  }
+  // Llenar el select
+  const valorActual = sel.value;
+  sel.innerHTML = '<option value="">— Seleccionar —</option>' +
+    _centrosCostoCache.map(cc =>
+      `<option value="${cc}"${cc === valorActual ? ' selected' : ''}>${cc}</option>`
+    ).join('');
+}
+
+async function abrirModalEmpleado(r = null) {
   _editingId = r?.id ?? null;
   document.getElementById('modalEmpTitle').textContent = r ? 'Editar Empleado' : 'Nuevo Empleado';
   document.getElementById('ef-codigo').value   = r?.codigo   ?? '';
   document.getElementById('ef-nombre').value   = r?.nombre   ?? '';
-  document.getElementById('ef-cc').value       = r?.centro_costo ?? '';
+  // Cargar opciones primero, luego seleccionar el valor actual
+  await _cargarCentrosCosto();
+  document.getElementById('ef-cc').value = r?.centro_costo ?? '';
   document.getElementById('ef-contrato').value = r?.contrato ?? '';
   // Detectar si tiene licencia médica vigente (o sin fecha fin = sigue en licencia)
   const hoyModal = new Date().toISOString().substring(0,10);
@@ -2051,6 +2083,7 @@ async function guardarEmpleado() {
 
   if (error) { toast('Error: '+error.message,'error'); return; }
   toast(_editingId ? '✅ Empleado actualizado' : '✅ Empleado agregado');
+  _centrosCostoCache = null; // invalidar caché al guardar
   cerrarModal('modalEmp');
   loadEmpleados();
   loadCounts();
