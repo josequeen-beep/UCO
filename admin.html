@@ -1037,23 +1037,55 @@ body {
           <button class="btn btn-secondary" onclick="loadAuditLog()">🔄 Recargar</button>
         </div>
       </div>
+      <!-- Filtros -->
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px">
+        <div>
+          <label style="font-size:11px;font-weight:700;color:var(--muted);display:block;margin-bottom:4px">ACCIÓN</label>
+          <select class="form-select" id="audit-fil-accion" style="width:140px" onchange="loadAuditLog()">
+            <option value="">Todas</option>
+            <option value="CREATE">CREATE</option>
+            <option value="UPDATE">UPDATE</option>
+            <option value="DELETE">DELETE</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-size:11px;font-weight:700;color:var(--muted);display:block;margin-bottom:4px">DESDE</label>
+          <input type="date" class="form-input" id="audit-fil-desde" style="width:150px" onchange="loadAuditLog()">
+        </div>
+        <div>
+          <label style="font-size:11px;font-weight:700;color:var(--muted);display:block;margin-bottom:4px">HASTA</label>
+          <input type="date" class="form-input" id="audit-fil-hasta" style="width:150px" onchange="loadAuditLog()">
+        </div>
+        <div>
+          <label style="font-size:11px;font-weight:700;color:var(--muted);display:block;margin-bottom:4px">BUSCAR</label>
+          <input class="form-input" id="audit-fil-busq" placeholder="Código, nombre..." style="width:220px"
+            oninput="debounce('audit',loadAuditLog,400)">
+        </div>
+        <div style="margin-left:auto;align-self:flex-end">
+          <span id="audit-count" style="font-size:12px;color:var(--muted)">— registros</span>
+        </div>
+        <button class="btn btn-secondary btn-sm" onclick="limpiarFiltrosAudit()">✕ Limpiar</button>
+      </div>
       <div class="table-area">
         <div class="data-table-wrap">
           <table class="data-table">
             <thead>
               <tr>
-                <th>Timestamp</th>
+                <th style="white-space:nowrap">Fecha y Hora</th>
                 <th>Usuario</th>
+                <th>Email</th>
                 <th>Acción</th>
                 <th>Detalle</th>
               </tr>
             </thead>
             <tbody id="tbodyAudit">
-              <tr class="loading-row"><td colspan="4"><span class="spinner"></span>Cargando…</td></tr>
+              <tr class="loading-row"><td colspan="5"><span class="spinner"></span>Cargando…</td></tr>
             </tbody>
           </table>
         </div>
       </div>
+      <!-- Paginación -->
+      <div style="display:flex;justify-content:center;align-items:center;gap:10px;margin-top:12px" id="audit-pagination"></div>
     </div>
 
     <!-- ══ PÁGINA: REVISIÓN ASISTENCIA ══ -->
@@ -1717,12 +1749,16 @@ function fmtFecha(v) {
 }
 function fmtTs(v) {
   if (!v) return '—';
-  var s = String(v).replace(/([+-]\d{2}:\d{2}|Z)$/,'');
-  var parts = s.replace('T',' ').split(' ');
-  var dp = (parts[0]||'').split('-');
-  if(dp.length !== 3) return s.substring(0,16);
-  var tp = parts[1] ? parts[1].substring(0,5).replace(/^0/,'') : '';
-  return dp[2]+'-'+dp[1]+'-'+dp[0]+(tp?' '+tp:'');
+  try {
+    // Convertir a hora local de Chile (America/Santiago)
+    const d = new Date(v);
+    if (isNaN(d)) return String(v).substring(0,16);
+    const opts = { timeZone:'America/Santiago', year:'numeric', month:'2-digit',
+      day:'2-digit', hour:'2-digit', minute:'2-digit', hour12:false };
+    const p = new Intl.DateTimeFormat('es-CL', opts).formatToParts(d);
+    const get = t => (p.find(x=>x.type===t)||{value:''}).value;
+    return get('day')+'-'+get('month')+'-'+get('year')+' '+get('hour').replace(/^0/,'')+':'+get('minute');
+  } catch(e) { return String(v).substring(0,16); }
 }
 function localToday() {
   const d = new Date();
@@ -2035,7 +2071,16 @@ async function abrirModalEmpleado(r = null) {
   document.getElementById('ef-nombre').value   = r?.nombre   ?? '';
   // Cargar opciones primero, luego seleccionar el valor actual
   await _cargarCentrosCosto();
-  document.getElementById('ef-cc').value = r?.centro_costo ?? '';
+  // Forzar selección del valor actual (el select ya tiene las opciones)
+  const ccVal = r?.centro_costo ?? '';
+  const selCC = document.getElementById('ef-cc');
+  selCC.value = ccVal;
+  // Si el valor no está en las opciones, agregarlo dinámicamente
+  if (ccVal && selCC.value !== ccVal) {
+    const opt = document.createElement('option');
+    opt.value = ccVal; opt.textContent = ccVal; opt.selected = true;
+    selCC.appendChild(opt);
+  }
   document.getElementById('ef-contrato').value = r?.contrato ?? '';
   // Detectar si tiene licencia médica vigente (o sin fecha fin = sigue en licencia)
   const hoyModal = new Date().toISOString().substring(0,10);
@@ -2052,7 +2097,7 @@ async function abrirModalEmpleado(r = null) {
 async function editarEmpleado(id) {
   const db = getClient();
   const { data } = await db.from('empleados').select('*').eq('id', id).single();
-  if (data) abrirModalEmpleado(data);
+  if (data) await abrirModalEmpleado(data);
 }
 
 async function guardarEmpleado() {
@@ -2255,27 +2300,90 @@ async function guardarNoReg() {
 // ════════════════════════════════════════════════════
 //  ═══ AUDIT LOG ═══
 // ════════════════════════════════════════════════════
+let _auditPage = 1;
+const _AUDIT_PER_PAGE = 100;
+
+function limpiarFiltrosAudit() {
+  const ids = ['audit-fil-accion','audit-fil-desde','audit-fil-hasta','audit-fil-busq'];
+  ids.forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
+  _auditPage = 1;
+  loadAuditLog();
+}
+
 async function loadAuditLog() {
   const db = getClient(); if (!db) return;
   const tbody = document.getElementById('tbodyAudit');
-  tbody.innerHTML = '<tr class="loading-row"><td colspan="4"><span class="spinner"></span>Cargando…</td></tr>';
+  tbody.innerHTML = '<tr class="loading-row"><td colspan="5"><span class="spinner"></span>Cargando…</td></tr>';
 
-  const { data, error } = await db.from('audit_log').select('*').order('timestamp',{ascending:false}).limit(200);
+  const accion = (document.getElementById('audit-fil-accion')?.value || '').trim();
+  const desde  = (document.getElementById('audit-fil-desde')?.value  || '').trim();
+  const hasta  = (document.getElementById('audit-fil-hasta')?.value  || '').trim();
+  const busq   = (document.getElementById('audit-fil-busq')?.value   || '').trim().toLowerCase();
+
+  // Construir query con filtros
+  let q = db.from('audit_log').select('*', { count:'exact' })
+    .order('timestamp', { ascending: false });
+
+  if (accion) q = q.eq('accion', accion);
+  if (desde)  q = q.gte('timestamp', desde + 'T00:00:00');
+  if (hasta)  q = q.lte('timestamp', hasta + 'T23:59:59');
+  if (busq)   q = q.ilike('detalle', '%' + busq + '%');
+
+  // Paginación
+  const ini = (_auditPage - 1) * _AUDIT_PER_PAGE;
+  q = q.range(ini, ini + _AUDIT_PER_PAGE - 1);
+
+  const { data, error, count } = await q;
   if (error) { toast('Error: '+error.message,'error'); return; }
 
+  // Actualizar contador
+  const countEl = document.getElementById('audit-count');
+  if (countEl) countEl.textContent = (count||0).toLocaleString('es-CL') + ' registros';
+
   if (!data?.length) {
-    tbody.innerHTML = '<tr><td colspan="4"><div class="empty-state"><div class="ei">🔍</div><p>Sin registros</p></div></td></tr>';
+    tbody.innerHTML = '<tr><td colspan="5"><div class="empty-state"><div class="ei">🔍</div><p>Sin registros</p></div></td></tr>';
+    document.getElementById('audit-pagination').innerHTML = '';
     return;
   }
 
+  // Obtener mapa de usuarios (email) desde tabla usuarios
+  let usuarioMap = {};
+  try {
+    const { data: usrs } = await db.from('usuarios').select('id,email,nombre');
+    (usrs||[]).forEach(u => { usuarioMap[u.nombre||''] = u.email||''; });
+  } catch(e) {}
+
   const colAccion = { CREATE:'badge-active', UPDATE:'badge-dia', DELETE:'badge-noche' };
-  tbody.innerHTML = data.map(r => `
-    <tr>
-      <td style="font-family:var(--mono);font-size:11px">${fmtTs(r.timestamp)}</td>
-      <td>${esc(r.usuario)}</td>
+
+  tbody.innerHTML = data.map(r => {
+    const email = r.email || usuarioMap[r.usuario] || '';
+    // Parsear detalle para mostrar código/nombre resaltados
+    const det = esc(r.detalle||'');
+    return `<tr>
+      <td style="font-family:var(--mono);font-size:11px;white-space:nowrap">${fmtTs(r.timestamp)}</td>
+      <td style="font-size:12px;font-weight:600">${esc(r.usuario||'—')}</td>
+      <td style="font-size:11px;color:var(--muted)">${esc(email)}</td>
       <td><span class="badge ${colAccion[r.accion]||''}">${esc(r.accion)}</span></td>
-      <td title="${esc(r.detalle)}" style="max-width:300px;overflow:hidden;text-overflow:ellipsis">${esc(r.detalle)}</td>
-    </tr>`).join('');
+      <td style="font-size:12px;max-width:500px" title="${det}">${det}</td>
+    </tr>`;
+  }).join('');
+
+  // Renderizar paginación
+  const totalPags = Math.ceil((count||0) / _AUDIT_PER_PAGE);
+  const pag = document.getElementById('audit-pagination');
+  if (pag && totalPags > 1) {
+    let btns = '';
+    btns += `<button class="btn btn-secondary btn-sm" onclick="_auditIrPag(${_auditPage-1})" ${_auditPage<=1?'disabled':''}>‹ Anterior</button>`;
+    btns += `<span style="font-size:12px;color:var(--muted)">Página ${_auditPage} de ${totalPags}</span>`;
+    btns += `<button class="btn btn-secondary btn-sm" onclick="_auditIrPag(${_auditPage+1})" ${_auditPage>=totalPags?'disabled':''}>Siguiente ›</button>`;
+    pag.innerHTML = btns;
+  } else if (pag) { pag.innerHTML = ''; }
+}
+
+function _auditIrPag(p) {
+  _auditPage = p;
+  loadAuditLog();
+  document.getElementById('page-auditlog')?.scrollTo(0,0);
 }
 
 // ════════════════════════════════════════════════════
