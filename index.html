@@ -389,7 +389,13 @@ async function obtenerAusentesDia(fechaStr){
         vacSet=new Set(codigos);
         // Guardar mapa codigo → fechas para mostrar en badge
         const vacFechas={};
-        (vacData||[]).forEach(r=>{ vacFechas[r.codigo]={ini:r.fecha_inicio||'',fin:r.fecha_fin||''}; });
+        const esFechaVal = v => v && /^\d{4}-\d{2}-\d{2}/.test(String(v).trim());
+        (vacData||[]).forEach(r=>{
+          vacFechas[r.codigo]={
+            ini: esFechaVal(r.fecha_inicio) ? r.fecha_inicio : '',
+            fin: esFechaVal(r.fecha_fin)    ? r.fecha_fin    : ''
+          };
+        });
         _cPut('ext_vac',codigos,_SB_CONFIG.CACHE_EXT);
         _cPut('ext_vac_fechas',vacFechas,_SB_CONFIG.CACHE_EXT);
       }
@@ -5129,13 +5135,15 @@ function renderAusentes(ausentes){
   const x    = v => String(v||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 
   const fmtFechaRango = (ini, fin) => {
-    if(!ini) return '';
+    // Validar que sean fechas reales (formato yyyy-MM-dd)
+    const esFecha = v => v && /^\d{4}-\d{2}-\d{2}/.test(String(v).trim());
+    if(!esFecha(ini)) return '';
     const f = v => {
       if(!v) return '';
-      const p = v.substring(0,10).split('-');
-      return p.length===3 ? p[2]+'-'+p[1]+'-'+p[0] : v.substring(0,10);
+      const p = String(v).substring(0,10).split('-');
+      return p.length===3 ? p[2]+'-'+p[1]+'-'+p[0] : String(v).substring(0,10);
     };
-    return fin
+    return esFecha(fin)
       ? `<span style="font-size:10px;font-weight:500;margin-left:6px;opacity:.85">📅 ${f(ini)} → ${f(fin)}</span>`
       : `<span style="font-size:10px;font-weight:500;margin-left:6px;opacity:.85">📅 desde ${f(ini)}</span>`;
   };
