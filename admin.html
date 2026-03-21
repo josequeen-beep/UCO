@@ -1200,7 +1200,8 @@ body {
                 <code style="background:var(--surface);border:1px solid var(--border);padding:2px 7px;border-radius:4px;font-size:11px;display:block;margin-bottom:4px">codigo</code>
                 <code style="background:var(--surface);border:1px solid var(--border);padding:2px 7px;border-radius:4px;font-size:11px;display:block;margin-bottom:4px">nombre</code>
                 <code style="background:var(--surface);border:1px solid var(--border);padding:2px 7px;border-radius:4px;font-size:11px;display:block;margin-bottom:4px">centro_costo</code>
-                <code style="background:var(--surface);border:1px solid var(--border);padding:2px 7px;border-radius:4px;font-size:11px;display:block">contrato</code>
+                <code style="background:var(--surface);border:1px solid var(--border);padding:2px 7px;border-radius:4px;font-size:11px;display:block;margin-bottom:4px">contrato</code>
+                <code style="background:var(--surface);border:1px solid var(--border);padding:2px 7px;border-radius:4px;font-size:11px;display:block;color:var(--accent)">turno <span style="font-weight:400;opacity:.7">(se asigna al importar)</span></code>
               </div>
             </div>
             <div style="background:var(--surface3);border:1px solid var(--border);border-radius:10px;padding:14px;flex:1;min-width:220px">
@@ -1220,12 +1221,24 @@ body {
         <div class="settings-section">
           <div class="settings-section-title"><span class="sticon">📤</span> Subir archivo Excel o CSV</div>
           <div style="padding:20px">
-            <div style="margin-bottom:16px">
-              <label class="form-label">Tabla destino</label>
-              <select class="form-select" id="importTabla" style="margin-top:6px;width:200px">
-                <option value="empleados">👥 Empleados</option>
-                <option value="produccion">🏭 Producción</option>
-              </select>
+            <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-end;margin-bottom:16px">
+              <div>
+                <label class="form-label">Tabla destino</label>
+                <select class="form-select" id="importTabla" style="margin-top:6px;width:200px"
+                  onchange="toggleImportTurno()">
+                  <option value="empleados">👥 Empleados</option>
+                  <option value="produccion">🏭 Producción</option>
+                </select>
+              </div>
+              <!-- Selector turno: solo visible para empleados -->
+              <div id="importTurnoWrap">
+                <label class="form-label">Turno de empleados *</label>
+                <select class="form-select" id="importTurno" style="margin-top:6px;width:180px">
+                  <option value="Día">☀️ Turno Día</option>
+                  <option value="Tarde">🌅 Turno Tarde</option>
+                  <option value="Noche">🌙 Turno Noche</option>
+                </select>
+              </div>
             </div>
             <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" onchange="handleFileSelect(event)" style="display:none">
             <div class="import-zone" id="importZone"
@@ -3296,6 +3309,12 @@ function procesarArchivo(file) {
   reader.readAsArrayBuffer(file);
 }
 
+function toggleImportTurno() {
+  var tabla = document.getElementById('importTabla').value;
+  var wrap  = document.getElementById('importTurnoWrap');
+  if (wrap) wrap.style.display = tabla === 'empleados' ? '' : 'none';
+}
+
 async function ejecutarImport() {
   var db = getClient();
   if (!db) { toast('Sin conexión a Supabase — ve a Configuración', 'error', 5000); return; }
@@ -3315,7 +3334,7 @@ async function ejecutarImport() {
 
     // Columnas válidas por tabla — ignorar columnas desconocidas o vacías del Excel
     var COLS_VALIDAS = {
-      empleados:  ['codigo','nombre','centro_costo','contrato','activo'],
+      empleados:  ['codigo','nombre','centro_costo','contrato','activo','turno'],
       produccion: ['especie','funcion','producto','proceso','operacion','responsable','linea','linea_especial','funcion_especial','activo'],
     };
     var colsValidas = COLS_VALIDAS[tabla] || null;
@@ -3333,7 +3352,12 @@ async function ejecutarImport() {
       });
       // Valor por defecto para activo en produccion
       if (tabla === 'produccion' && !('activo' in r)) r.activo = true;
-      if (tabla === 'empleados'  && !('activo' in r)) r.activo = true;
+      if (tabla === 'empleados') {
+        if (!('activo' in r)) r.activo = true;
+        // Asignar turno seleccionado en el importador
+        var turnoImport = (document.getElementById('importTurno')||{}).value || 'Día';
+        r.turno = turnoImport;
+      }
       return r;
     });
 
@@ -3377,7 +3401,7 @@ async function ejecutarImport() {
 function descargarPlantilla(tabla) {
   if (typeof XLSX === 'undefined') { toast('Librería Excel no cargada', 'error'); return; }
   var cols = {
-    empleados:  [['codigo', 'nombre', 'centro_costo', 'contrato']],
+    empleados:  [['codigo', 'nombre', 'centro_costo', 'contrato', 'turno']],
     produccion: [['especie', 'funcion', 'producto', 'proceso', 'operacion', 'responsable', 'linea', 'linea_especial', 'funcion_especial']],
   };
   var ws = XLSX.utils.aoa_to_sheet(cols[tabla]);
