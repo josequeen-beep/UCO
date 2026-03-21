@@ -1477,9 +1477,25 @@ input.chk-reg:hover:not(:checked){ border-color:#e05252; }
 .row-duplicado{background:rgba(224,82,82,.10)!important;outline:1.5px solid rgba(224,82,82,.35)}
 .row-duplicado:hover{background:rgba(224,82,82,.17)!important}
 body.noche-mode .row-duplicado{background:rgba(255,80,80,.08)!important;outline:1.5px solid rgba(255,100,100,.3)}
+/* ── Cambio proceso — colores únicos por número ── */
 .row-cambio-proceso{background:rgba(255,152,0,.10)!important;outline:1.5px solid rgba(255,152,0,.4)}
 .row-cambio-proceso:hover{background:rgba(255,152,0,.17)!important}
 body.noche-mode .row-cambio-proceso{background:rgba(255,140,0,.08)!important;outline:1.5px solid rgba(255,160,0,.3)}
+/* Cambio 1 — Naranja */
+.row-cambio-1{background:rgba(255,152,0,.10)!important;outline:1.5px solid rgba(255,152,0,.45)}
+.row-cambio-1:hover{background:rgba(255,152,0,.18)!important}
+/* Cambio 2 — Azul */
+.row-cambio-2{background:rgba(37,99,235,.09)!important;outline:1.5px solid rgba(37,99,235,.4)}
+.row-cambio-2:hover{background:rgba(37,99,235,.16)!important}
+/* Cambio 3 — Verde */
+.row-cambio-3{background:rgba(22,163,74,.09)!important;outline:1.5px solid rgba(22,163,74,.4)}
+.row-cambio-3:hover{background:rgba(22,163,74,.16)!important}
+/* Cambio 4 — Morado */
+.row-cambio-4{background:rgba(124,58,237,.09)!important;outline:1.5px solid rgba(124,58,237,.4)}
+.row-cambio-4:hover{background:rgba(124,58,237,.16)!important}
+/* Cambio 5 — Rosado */
+.row-cambio-5{background:rgba(219,39,119,.09)!important;outline:1.5px solid rgba(219,39,119,.4)}
+.row-cambio-5:hover{background:rgba(219,39,119,.16)!important}
 /* Resaltado por estado de ausencia */
 .row-vacacion{background:rgba(0,148,212,.08)!important;border-left:3px solid #0094d4!important}
 .row-vacacion:hover{background:rgba(0,148,212,.14)!important}
@@ -1509,6 +1525,11 @@ body.noche-mode .row-cambio-proceso{background:rgba(255,140,0,.08)!important;out
 .dup-badge svg{width:11px;height:11px;flex-shrink:0}
 .dup-badge-igual{background:rgba(224,82,82,.15);color:#c0392b;border-color:rgba(224,82,82,.3)}
 .dup-badge-cambio{background:rgba(255,152,0,.15);color:#c85000;border:1px solid rgba(255,152,0,.4)}
+.dup-badge-cambio-1{background:rgba(255,152,0,.15);color:#c85000;border:1px solid rgba(255,152,0,.4)}
+.dup-badge-cambio-2{background:rgba(37,99,235,.13);color:#1d4ed8;border:1px solid rgba(37,99,235,.35)}
+.dup-badge-cambio-3{background:rgba(22,163,74,.13);color:#15803d;border:1px solid rgba(22,163,74,.35)}
+.dup-badge-cambio-4{background:rgba(124,58,237,.13);color:#6d28d9;border:1px solid rgba(124,58,237,.35)}
+.dup-badge-cambio-5{background:rgba(219,39,119,.13);color:#be185d;border:1px solid rgba(219,39,119,.35)}
 .empty-state{text-align:center;padding:50px 20px;color:var(--muted)}
 .empty-state .ei{font-size:44px;margin-bottom:10px}
 
@@ -4393,9 +4414,10 @@ function renderTabla(rows){
       trClass = ' class="row-duplicado' + (ausClass?' '+ausClass:'') + '"';
       dupCell = `<td title="Registro duplicado — misma información"><span class="dup-badge dup-badge-igual">${dupIcon} Duplicado</span></td>`;
     } else if(tipoFila && tipoFila.startsWith('cambio_')){
-      trClass = ' class="row-cambio-proceso' + (ausClass?' '+ausClass:'') + '"';
+      const numCambio = tipoFila.split('_')[1] || '1';
+      trClass = ' class="row-cambio-' + numCambio + (ausClass?' '+ausClass:'') + '"';
       const labelCambio = _labelCambio[tipoFila] || 'Cambio proceso';
-      dupCell = `<td title="Cambio de proceso detectado"><span class="dup-badge dup-badge-cambio">${cambioIcon} ${labelCambio}</span></td>`;
+      dupCell = `<td title="Cambio de proceso detectado"><span class="dup-badge dup-badge-cambio-${numCambio}">${cambioIcon} ${labelCambio}</span></td>`;
     } else {
       trClass = ausClass ? ' class="'+ausClass+'"' : '';
       dupCell = ausPill ? `<td>${ausPill}</td>` : '<td></td>';
