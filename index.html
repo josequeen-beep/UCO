@@ -130,20 +130,50 @@ async function _audit(accion,detalle){
 async function getListData(){
   const cKey='ld_v'+_SB_CONFIG.VERSION, cached=_cGet(cKey);
   if(cached) return cached;
-  const {data,error}=await _sbDb().from('produccion')
-    .select('especie,funcion,producto,proceso,operacion,responsable,linea,linea_especial,funcion_especial')
-    .eq('activo',true);
-  if(error){ console.error('[LISTAS]',error.message); return {especies:[],lineas:[],responsables:[],mapaEspecie:{},mapaProducto:{},mapaLinea:{}}; }
-  const LESP=new Set(['EMPAQUE','MPRIMA','SERVICIOS','STAFF','SUBPRODUCTO']);
+
+  // Consultar ambas secciones en paralelo
+  const [resProcesos, resEspeciales, resLineas] = await Promise.all([
+    _sbDb().from('produccion')
+      .select('especie,funcion,producto,proceso,operacion,responsable,linea,linea_especial,funcion_especial')
+      .eq('activo',true).eq('seccion','procesos'),
+    _sbDb().from('produccion')
+      .select('linea_especial,funcion_especial')
+      .eq('activo',true).eq('seccion','especiales'),
+    _sbDb().from('produccion')
+      .select('linea')
+      .eq('activo',true).eq('seccion','lineas'),
+  ]);
+
+  if(resProcesos.error) console.error('[LISTAS]',resProcesos.error.message);
+
   const uniq=a=>[...new Set(a.map(v=>String(v||'').trim()).filter(Boolean))].sort();
   let esp=[],fun=[],pro=[],proc=[],oper=[],lin=[];
   const respSet=new Set(), mE={},mP={},mL={};
-  (data||[]).forEach(r=>{
+
+  // Construir mL dinámicamente desde tabla especiales (sección especiales)
+  const lesp_dinamico=new Set();
+  (resEspeciales.data||[]).forEach(r=>{
+    const le=(r.linea_especial||'').toUpperCase().trim();
+    const lf=(r.funcion_especial||'').trim();
+    if(!le) return;
+    lesp_dinamico.add(le);
+    if(!mL[le]) mL[le]=[];
+    if(lf && !mL[le].includes(lf)) mL[le].push(lf);
+    if(!lin.includes(le)) lin.push(le);
+  });
+
+  // Líneas normales desde sección lineas
+  (resLineas.data||[]).forEach(r=>{
+    const l=(r.linea||'').trim();
+    if(l && !lesp_dinamico.has(l.toUpperCase()) && !lin.includes(l)) lin.push(l);
+  });
+
+  // Procesos: especie, función, producto, proceso, operación, responsable
+  (resProcesos.data||[]).forEach(r=>{
     const e=r.especie||'',f=r.funcion||'',p=r.producto||'',pr=r.proceso||'',op=r.operacion||'',
-          rs=r.responsable||'',l=r.linea||'',le=(r.linea_especial||'').toUpperCase(),lf=r.funcion_especial||'';
+          rs=r.responsable||'';
     if(e) esp.push(e); if(f) fun.push(f); if(p) pro.push(p);
     if(pr) proc.push(pr); if(op) oper.push(op); if(rs) respSet.add(rs);
-    if(l && !LESP.has(l.toUpperCase())) lin.push(l);
     if(e&&p){
       if(!mE[e]) mE[e]={productos:[]};
       if(!mE[e].productos.includes(p)) mE[e].productos.push(p);
@@ -153,15 +183,33 @@ async function getListData(){
       if(pr&&!mP[k].procesos.includes(pr)) mP[k].procesos.push(pr);
       if(op&&!mP[k].operaciones.includes(op)) mP[k].operaciones.push(op);
     }
-    if(le&&LESP.has(le)&&lf){
-      if(!mL[le]) mL[le]=[];
-      if(!mL[le].includes(lf)) mL[le].push(lf);
-      if(!lin.includes(le)) lin.push(le);
-    }
   });
-  const result={especies:uniq(esp),funciones:uniq(fun),productos:uniq(pro),procesos:uniq(proc),
-    operaciones:uniq(oper),responsables:[...uniq([...respSet])],lineas:uniq(lin),
-    mapaEspecie:mE,mapaProducto:mP,mapaLinea:mL,version:_SB_CONFIG.VERSION};
+
+  // También incluir responsables desde sección responsables
+  const resResp = await _sbDb().from('produccion')
+    .select('responsable').eq('activo',true).eq('seccion','responsables');
+  (resResp.data||[]).forEach(r=>{ if(r.responsable) respSet.add(r.responsable); });
+
+  // Ordenar líneas: primero numéricas, luego texto
+  const linOrdenadas = [...new Set(lin.filter(Boolean).map(v=>String(v).trim()))].sort((a,b)=>{
+    const na=parseFloat(a), nb=parseFloat(b);
+    if(!isNaN(na)&&!isNaN(nb)) return na-nb;
+    if(!isNaN(na)) return -1;
+    if(!isNaN(nb)) return 1;
+    return a.localeCompare(b,'es');
+  });
+
+  // Actualizar LINEAS_ESPECIALES dinámicamente para esLineaEspecial()
+  window._lineaEspecialDinamica = lesp_dinamico;
+
+  const result={
+    especies:uniq(esp), funciones:uniq(fun), productos:uniq(pro),
+    procesos:uniq(proc), operaciones:uniq(oper),
+    responsables:[...uniq([...respSet])],
+    lineas: linOrdenadas,
+    mapaEspecie:mE, mapaProducto:mP, mapaLinea:mL,
+    version:_SB_CONFIG.VERSION
+  };
   _cPut(cKey,result,_SB_CONFIG.CACHE_TTL);
   return result;
 }
@@ -2985,10 +3033,17 @@ function preRellenarHorasFiltro(t){
 //  LÍNEAS ESPECIALES — sin cascada, solo función
 //  Col H = Línea especial, Col I = Función
 // ══════════════════════════════════════════
-const LINEAS_ESPECIALES = ['EMPAQUE','MPRIMA','SERVICIOS','STAFF','SUBPRODUCTO'];
+// LINEAS_ESPECIALES se construye dinámicamente desde Supabase en getListData()
+// Se mantiene el fallback hardcodeado por si getListData no ha cargado aún
+const LINEAS_ESPECIALES_FALLBACK = ['EMPAQUE','MPRIMA','SERVICIOS','STAFF','SUBPRODUCTO'];
 
 function esLineaEspecial(linea){
-  return LINEAS_ESPECIALES.includes((linea||'').toUpperCase().trim());
+  const l = (linea||'').toUpperCase().trim();
+  // Usar set dinámico si ya cargó, si no usar fallback
+  if(window._lineaEspecialDinamica && window._lineaEspecialDinamica.size > 0){
+    return window._lineaEspecialDinamica.has(l);
+  }
+  return LINEAS_ESPECIALES_FALLBACK.includes(l);
 }
 
 function onLineaChange(linea){
@@ -3056,7 +3111,8 @@ function aplicarListas(d){
   mapaEspecie  = d.mapaEspecie  || {};
   mapaProducto = d.mapaProducto || {};
   window._listas = d;
-  fillSel('linea',       d.lineas);
+  // Poblar línea con grupos: normales arriba, especiales abajo
+  _fillSelLinea(d.lineas, window._lineaEspecialDinamica);
   fillSel('especie',     d.especies);
   fillSel('producto',  [], '— Seleccione especie —');
   fillSel('funcion',   [], '— Seleccione especie y producto —');
@@ -3081,6 +3137,31 @@ function fillSel(id, items, ph){
   const s=document.getElementById(id); if(!s) return;
   s.innerHTML='<option value="">'+( ph||'— Seleccionar —')+'</option>';
   (items||[]).forEach(v=>{const o=document.createElement('option');o.value=v;o.textContent=v;s.appendChild(o);});
+}
+
+function _fillSelLinea(lineas, lesp){
+  const s=document.getElementById('linea'); if(!s) return;
+  s.innerHTML='<option value="">— Seleccionar —</option>';
+  const normales=[], especiales=[];
+  (lineas||[]).forEach(v=>{
+    const up=(v||'').toUpperCase().trim();
+    if(lesp && lesp.has(up)) especiales.push(v);
+    else normales.push(v);
+  });
+  // Grupo líneas normales
+  if(normales.length){
+    const og=document.createElement('optgroup');
+    og.label='── Líneas';
+    normales.forEach(v=>{const o=document.createElement('option');o.value=v;o.textContent=v;og.appendChild(o);});
+    s.appendChild(og);
+  }
+  // Grupo líneas especiales
+  if(especiales.length){
+    const og2=document.createElement('optgroup');
+    og2.label='── Líneas Especiales';
+    especiales.forEach(v=>{const o=document.createElement('option');o.value=v;o.textContent=v;og2.appendChild(o);});
+    s.appendChild(og2);
+  }
 }
 
 // ══════════════════════════════════════════════════════════
@@ -4150,54 +4231,6 @@ function onFiltroTurnoChange(){
   aplicarFiltros();
 }
 
-function aplicarFiltros(){
-  const desde     = document.getElementById('filtroDesde').value;
-  // Recargar mapa de ausencias si cambió la fecha
-  if(desde) _cargarAusenciasMap(desde);
-  const desdeHora = document.getElementById('filtroDesdeHora').value || '00:00';
-  const hasta     = document.getElementById('filtroHasta').value;
-  const hastaHora = document.getElementById('filtroHastaHora').value || '23:59';
-  const linea     = document.getElementById('filtroLinea').value;
-  const turno     = document.getElementById('filtroTurno').value;
-  const texto     = (document.getElementById('filtroTabla').value||'').toLowerCase().trim();
-
-  // Datetime completo para comparar con Proceso Inicio (col 14)
-  const dtDesde = desde ? (desde + 'T' + desdeHora) : null;
-  const dtHasta = hasta ? (hasta + 'T' + hastaHora)  : null;
-
-  // Resaltar filtros activos
-  ['filtroDesde','filtroDesdeHora','filtroHasta','filtroHastaHora'].forEach(id=>{
-    const el=document.getElementById(id);
-    if(el) el.classList.toggle('activo',(el.value||'')!=='');
-  });
-  ['filtroLinea','filtroTurno','filtroTabla'].forEach(id=>{
-    const el=document.getElementById(id);
-    if(el) el.classList.toggle('activo',(el.value||'')!=='');
-  });
-
-  const filtrado=todosRegistros.filter(r=>{
-    // procesoInicio es col 14: "yyyy-MM-ddTHH:mm" o "yyyy-MM-dd HH:mm"
-    const pIni = String(r[14]||'').replace(' ','T').substring(0,16);
-    const fechaReg = String(r[1]||'').substring(0,10);
-
-    // Filtro por rango de datetime (proceso inicio)
-    if(dtDesde){
-      const cmp = pIni || (fechaReg+'T00:00');
-      if(cmp < dtDesde) return false;
-    }
-    if(dtHasta){
-      const cmp = pIni || (fechaReg+'T23:59');
-      if(cmp > dtHasta) return false;
-    }
-
-    if(linea && String(r[4]||'').trim()!==linea) return false;
-    if(turno && !String(r[3]||'').toLowerCase().includes(turno.toLowerCase())) return false;
-    if(texto && !r.some(c=>String(c).toLowerCase().includes(texto))) return false;
-    return true;
-  });
-
-  renderTabla(filtrado);
-}
 
 function limpiarFiltros(){
   const hoy=localDate(new Date());
