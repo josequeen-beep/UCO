@@ -1036,7 +1036,7 @@ body {
           <button class="btn btn-danger" id="btnEliminarSelProd" onclick="confirmarEliminarSelProd()" style="display:none">
             🗑 Eliminar seleccionados (<span id="cntSelProd">0</span>)
           </button>
-          <button class="btn btn-primary" onclick="abrirModalProduccion()">＋ Nueva entrada</button>
+          <button class="btn btn-primary" onclick="abrirSeccion('procesos')">＋ Nuevo proceso</button>
         </div>
       </div>
       <div class="table-area">
@@ -1070,7 +1070,7 @@ body {
         <div><h1>👤 Responsables</h1><p>Lista de responsables por especie y producto</p></div>
         <div class="page-header-actions">
           <button class="btn btn-secondary" onclick="loadProdPage('responsables')">🔄 Recargar</button>
-          <button class="btn btn-primary" onclick="abrirModalProduccion()">＋ Nueva entrada</button>
+          <button class="btn btn-primary" onclick="abrirSeccion('responsables')">＋ Nuevo responsable</button>
         </div>
       </div>
       <div class="table-area">
@@ -1102,7 +1102,7 @@ body {
         <div><h1>🏭 Líneas</h1><p>Líneas de producción por especie y proceso</p></div>
         <div class="page-header-actions">
           <button class="btn btn-secondary" onclick="loadProdPage('lineas')">🔄 Recargar</button>
-          <button class="btn btn-primary" onclick="abrirModalProduccion()">＋ Nueva entrada</button>
+          <button class="btn btn-primary" onclick="abrirSeccion('lineas')">＋ Nueva línea</button>
         </div>
       </div>
       <div class="table-area">
@@ -1135,7 +1135,7 @@ body {
         <div><h1>⭐ Líneas Especiales</h1><p>Línea Especial y Función Especial</p></div>
         <div class="page-header-actions">
           <button class="btn btn-secondary" onclick="loadProdPage('especiales')">🔄 Recargar</button>
-          <button class="btn btn-primary" onclick="abrirModalProduccion()">＋ Nueva entrada</button>
+          <button class="btn btn-primary" onclick="abrirSeccion('especiales')">＋ Nueva línea especial</button>
         </div>
       </div>
       <div class="table-area">
@@ -1839,29 +1839,93 @@ body {
   </div>
 </div>
 
-<!-- ══ MODAL PRODUCCION ══ -->
-<div class="modal-overlay" id="modalProd">
+<!-- ══ MODAL PROCESOS ══ -->
+<div class="modal-overlay" id="modalProcesos">
   <div class="modal">
     <div class="modal-header">
-      <h2 id="modalProdTitle">Nueva entrada de Producción</h2>
-      <button class="modal-close" onclick="cerrarModal('modalProd')">✕</button>
+      <h2 id="modalProcesosTitle">🐟 Nuevo Proceso</h2>
+      <button class="modal-close" onclick="cerrarModal('modalProcesos')">✕</button>
     </div>
     <div class="modal-body">
       <div class="form-grid">
-        <div class="form-field"><label class="form-label">Especie</label><input class="form-input" id="pf-especie" placeholder="Ej: MERLUZA AUSTRAL"></div>
-        <div class="form-field"><label class="form-label">Producto</label><input class="form-input" id="pf-producto" placeholder="Ej: PORCION ESPAÑA"></div>
-        <div class="form-field"><label class="form-label">Función</label><input class="form-input" id="pf-funcion" placeholder="Ej: ABASTECIMIENTO"></div>
-        <div class="form-field"><label class="form-label">Proceso</label><input class="form-input" id="pf-proceso" placeholder="Ej: CONGELADO"></div>
-        <div class="form-field"><label class="form-label">Operación</label><input class="form-input" id="pf-operacion" placeholder="Ej: PORCIONADO MANUAL"></div>
-        <div class="form-field"><label class="form-label">Responsable</label><input class="form-input" id="pf-resp" placeholder="Nombre responsable"></div>
-        <div class="form-field"><label class="form-label">Línea</label><input class="form-input" id="pf-linea" placeholder="Ej: 1, EMPAQUE"></div>
-        <div class="form-field"><label class="form-label">Línea Especial</label><input class="form-input" id="pf-linea-esp" placeholder="Ej: EMPAQUE"></div>
-        <div class="form-field full"><label class="form-label">Función Especial</label><input class="form-input" id="pf-func-esp" placeholder="Ej: Operario Empaque"></div>
+        <div class="form-field"><label class="form-label">Especie *</label><input class="form-input" id="mp-especie" placeholder="Ej: MERLUZA AUSTRAL"></div>
+        <div class="form-field"><label class="form-label">Función</label><input class="form-input" id="mp-funcion" placeholder="Ej: ABASTECIMIENTO"></div>
+        <div class="form-field"><label class="form-label">Producto</label><input class="form-input" id="mp-producto" placeholder="Ej: PORCION ESPAÑA"></div>
+        <div class="form-field"><label class="form-label">Proceso</label><input class="form-input" id="mp-proceso" placeholder="Ej: CONGELADO"></div>
+        <div class="form-field full"><label class="form-label">Operación</label><input class="form-input" id="mp-operacion" placeholder="Ej: PORCIONADO MANUAL"></div>
       </div>
     </div>
     <div class="modal-footer">
-      <button class="btn btn-secondary" onclick="cerrarModal('modalProd')">Cancelar</button>
-      <button class="btn btn-primary" onclick="guardarProduccion()">💾 Guardar</button>
+      <button class="btn btn-secondary" onclick="cerrarModal('modalProcesos')">Cancelar</button>
+      <button class="btn btn-primary" onclick="guardarSeccion('procesos')">💾 Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL RESPONSABLES ══ -->
+<div class="modal-overlay" id="modalResponsables">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="modalResponsablesTitle">👤 Nuevo Responsable</h2>
+      <button class="modal-close" onclick="cerrarModal('modalResponsables')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-field full"><label class="form-label">Responsable *</label><input class="form-input" id="mr-responsable" placeholder="Nombre completo"></div>
+        <div class="form-field"><label class="form-label">Especie</label><input class="form-input" id="mr-especie" placeholder="Ej: MERLUZA AUSTRAL"></div>
+        <div class="form-field"><label class="form-label">Producto</label><input class="form-input" id="mr-producto" placeholder="Ej: PORCION ESPAÑA"></div>
+        <div class="form-field full"><label class="form-label">Proceso</label><input class="form-input" id="mr-proceso" placeholder="Ej: CONGELADO"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="cerrarModal('modalResponsables')">Cancelar</button>
+      <button class="btn btn-primary" onclick="guardarSeccion('responsables')">💾 Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL LÍNEAS ══ -->
+<div class="modal-overlay" id="modalLineas">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="modalLineasTitle">🏭 Nueva Línea</h2>
+      <button class="modal-close" onclick="cerrarModal('modalLineas')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-field full"><label class="form-label">Línea *</label><input class="form-input" id="ml-linea" placeholder="Ej: 1, EMPAQUE"></div>
+        <div class="form-field"><label class="form-label">Especie</label><input class="form-input" id="ml-especie" placeholder="Ej: MERLUZA AUSTRAL"></div>
+        <div class="form-field"><label class="form-label">Producto</label><input class="form-input" id="ml-producto" placeholder="Ej: PORCION ESPAÑA"></div>
+        <div class="form-field"><label class="form-label">Proceso</label><input class="form-input" id="ml-proceso" placeholder="Ej: CONGELADO"></div>
+        <div class="form-field"><label class="form-label">Operación</label><input class="form-input" id="ml-operacion" placeholder="Ej: PORCIONADO MANUAL"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="cerrarModal('modalLineas')">Cancelar</button>
+      <button class="btn btn-primary" onclick="guardarSeccion('lineas')">💾 Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL LÍNEAS ESPECIALES ══ -->
+<div class="modal-overlay" id="modalEspeciales">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="modalEspecialesTitle">⭐ Nueva Línea Especial</h2>
+      <button class="modal-close" onclick="cerrarModal('modalEspeciales')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-field"><label class="form-label">Línea Especial *</label><input class="form-input" id="me-linea-esp" placeholder="Ej: EMPAQUE"></div>
+        <div class="form-field"><label class="form-label">Función Especial</label><input class="form-input" id="me-func-esp" placeholder="Ej: Operario Empaque"></div>
+        <div class="form-field"><label class="form-label">Especie</label><input class="form-input" id="me-especie" placeholder="Ej: MERLUZA AUSTRAL"></div>
+        <div class="form-field"><label class="form-label">Producto</label><input class="form-input" id="me-producto" placeholder="Ej: PORCION ESPAÑA"></div>
+        <div class="form-field full"><label class="form-label">Responsable</label><input class="form-input" id="me-responsable" placeholder="Nombre responsable"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="cerrarModal('modalEspeciales')">Cancelar</button>
+      <button class="btn btn-primary" onclick="guardarSeccion('especiales')">💾 Guardar</button>
     </div>
   </div>
 </div>
@@ -2302,13 +2366,10 @@ async function loadCounts() {
     const el = document.getElementById('cnt-' + (t === 'audit_log' ? 'auditlog' : t));
     if (el) el.textContent = count ?? '—';
   }
-  // Producción por sección
-  const prodSecciones = ['procesos','responsables','lineas','especiales'];
-  for (const sec of prodSecciones) {
-    let q2 = db.from('produccion').select('*', { count:'exact', head:true });
-    if (sec === 'responsables') q2 = q2.not('responsable','is',null).neq('responsable','');
-    if (sec === 'especiales')   q2 = q2.not('linea_especial','is',null);
-    const { count: c2 } = await q2;
+  // Producción por sección (filtra por columna seccion)
+  for (const sec of ['procesos','responsables','lineas','especiales']) {
+    const { count: c2 } = await db.from('produccion')
+      .select('*', { count:'exact', head:true }).eq('seccion', sec);
     const el2 = document.getElementById('cnt-prod-'+sec);
     if (el2) el2.textContent = c2 ?? '—';
   }
@@ -2754,9 +2815,8 @@ async function loadProdPage(seccion) {
   let q = db.from('produccion').select('*', { count:'exact' })
     .order(sortCol, { ascending: sortAsc });
 
-  // Para responsables y especiales, filtrar solo filas con datos relevantes
-  if (seccion === 'responsables') q = q.not('responsable','is',null).neq('responsable','');
-  if (seccion === 'especiales')   q = q.or('linea_especial.neq.,funcion_especial.neq.').not('linea_especial','is',null);
+  // Filtrar por columna 'seccion' en Supabase (valor único por página)
+  q = q.eq('seccion', seccion);
 
   if (search) {
     const orStr = filtroOR[seccion].replace(/\%Q\%/g, `%${search}%`);
@@ -2788,8 +2848,8 @@ async function loadProdPage(seccion) {
   // Renderizar filas según sección
   tbody.innerHTML = data.map(r => {
     const acciones = `<td><div class="td-actions">
-      <button class="btn btn-secondary btn-sm" onclick="editarProduccion('${r.id}')">✏️</button>
-      <button class="btn btn-danger btn-sm"    onclick="confirmarEliminar('${r.id}_prod','${esc(r.especie||'')} / ${esc(r.producto||'')}')">🗑</button>
+      <button class="btn btn-secondary btn-sm" onclick="editarSeccion('${seccion}','${r.id}')">✏️</button>
+      <button class="btn btn-danger btn-sm"    onclick="confirmarEliminarSeccion('${seccion}','${r.id}','${esc(r.especie||'')}')">🗑</button>
     </div></td>`;
 
     const celdas = {
@@ -2834,48 +2894,137 @@ function sortProd(col) {
 
 
 
-function abrirModalProduccion(r = null) {
+// ── Config de campos por sección ──────────────────────────────
+const _SECCION_CFG = {
+  procesos: {
+    modal: 'modalProcesos', titleId: 'modalProcesosTitle',
+    titulo: ['🐟 Nuevo Proceso', '🐟 Editar Proceso'],
+    campos: { especie:'mp-especie', funcion:'mp-funcion', producto:'mp-producto', proceso:'mp-proceso', operacion:'mp-operacion' },
+    payload: r => ({ especie:r.especie, funcion:r.funcion, producto:r.producto, proceso:r.proceso, operacion:r.operacion, seccion:'procesos', activo:true }),
+    requerido: 'mp-especie', reqLabel: 'Especie'
+  },
+  responsables: {
+    modal: 'modalResponsables', titleId: 'modalResponsablesTitle',
+    titulo: ['👤 Nuevo Responsable', '👤 Editar Responsable'],
+    campos: { responsable:'mr-responsable', especie:'mr-especie', producto:'mr-producto', proceso:'mr-proceso' },
+    payload: r => ({ responsable:r.responsable, especie:r.especie, producto:r.producto, proceso:r.proceso, seccion:'responsables', activo:true }),
+    requerido: 'mr-responsable', reqLabel: 'Responsable'
+  },
+  lineas: {
+    modal: 'modalLineas', titleId: 'modalLineasTitle',
+    titulo: ['🏭 Nueva Línea', '🏭 Editar Línea'],
+    campos: { linea:'ml-linea', especie:'ml-especie', producto:'ml-producto', proceso:'ml-proceso', operacion:'ml-operacion' },
+    payload: r => ({ linea:r.linea, especie:r.especie, producto:r.producto, proceso:r.proceso, operacion:r.operacion, seccion:'lineas', activo:true }),
+    requerido: 'ml-linea', reqLabel: 'Línea'
+  },
+  especiales: {
+    modal: 'modalEspeciales', titleId: 'modalEspecialesTitle',
+    titulo: ['⭐ Nueva Línea Especial', '⭐ Editar Línea Especial'],
+    campos: { linea_especial:'me-linea-esp', funcion_especial:'me-func-esp', especie:'me-especie', producto:'me-producto', responsable:'me-responsable' },
+    payload: r => ({ linea_especial:r.linea_especial, funcion_especial:r.funcion_especial, especie:r.especie, producto:r.producto, responsable:r.responsable, seccion:'especiales', activo:true }),
+    requerido: 'me-linea-esp', reqLabel: 'Línea Especial'
+  }
+};
+
+// Mapeo campo DB → id input por sección
+const _CAMPO_MAP = {
+  especie:'especie', funcion:'funcion', producto:'producto', proceso:'proceso',
+  operacion:'operacion', responsable:'responsable', linea:'linea',
+  linea_especial:'linea_especial', funcion_especial:'funcion_especial', seccion:'seccion'
+};
+
+function abrirSeccion(seccion, r = null) {
+  const cfg = _SECCION_CFG[seccion]; if (!cfg) return;
   _editingId = r?.id ?? null;
-  document.getElementById('modalProdTitle').textContent = r ? 'Editar entrada' : 'Nueva entrada de Producción';
-  ['especie','producto','funcion','proceso','operacion','resp','linea','linea-esp','func-esp'].forEach(k => {
-    const map = {
-      'especie':'especie','producto':'producto','funcion':'funcion','proceso':'proceso',
-      'operacion':'operacion','resp':'responsable','linea':'linea','linea-esp':'linea_especial','func-esp':'funcion_especial'
-    };
-    document.getElementById('pf-'+k).value = r?.[map[k]] ?? '';
+  _editingSeccion = seccion;
+  document.getElementById(cfg.titleId).textContent = r ? cfg.titulo[1] : cfg.titulo[0];
+  // Limpiar y rellenar campos
+  Object.entries(cfg.campos).forEach(([dbKey, inputId]) => {
+    const el = document.getElementById(inputId);
+    if (el) el.value = r ? (r[dbKey] || '') : '';
   });
-  document.getElementById('modalProd').classList.add('open');
+  document.getElementById(cfg.modal).classList.add('open');
 }
 
-async function editarProduccion(id) {
-  const db = getClient();
-  const { data } = await db.from('produccion').select('*').eq('id', id).single();
-  if (data) abrirModalProduccion(data);
-}
-
-async function guardarProduccion() {
+async function editarSeccion(seccion, id) {
   const db = getClient(); if (!db) return;
-  const g = k => document.getElementById('pf-'+k).value.trim();
-  const payload = {
-    especie: g('especie'), producto: g('producto'), funcion: g('funcion'),
-    proceso: g('proceso'), operacion: g('operacion'), responsable: g('resp'),
-    linea: g('linea'), linea_especial: g('linea-esp'), funcion_especial: g('func-esp'),
-    activo: true,
-  };
+  const { data } = await db.from('produccion').select('*').eq('id', id).single();
+  if (data) abrirSeccion(seccion, data);
+}
+
+async function guardarSeccion(seccion) {
+  const db = getClient(); if (!db) return;
+  const cfg = _SECCION_CFG[seccion]; if (!cfg) return;
+
+  // Leer valores de los inputs
+  const vals = {};
+  Object.entries(cfg.campos).forEach(([dbKey, inputId]) => {
+    const el = document.getElementById(inputId);
+    vals[dbKey] = el ? el.value.trim() : '';
+  });
+
+  // Validar campo requerido
+  if (!vals[Object.keys(cfg.campos)[0]]) {
+    toast(`${cfg.reqLabel} es obligatorio`, 'error'); return;
+  }
+
+  const payload = cfg.payload(vals);
 
   let error;
   if (_editingId) {
     ({ error } = await db.from('produccion').update(payload).eq('id', _editingId));
   } else {
+    // Verificar que no exista duplicado en esta sección
+    const campoUnico = Object.keys(cfg.campos)[0];
+    const valUnico   = vals[campoUnico];
+    const { data: exist } = await db.from('produccion')
+      .select('id').eq('seccion', seccion).eq(campoUnico, valUnico).limit(1);
+    if (exist?.length) {
+      toast(`Ya existe "${valUnico}" en esta sección`, 'error'); return;
+    }
     ({ error } = await db.from('produccion').insert(payload));
   }
 
-  if (error) { toast('Error: '+error.message,'error'); return; }
+  if (error) { toast('Error: '+error.message, 'error'); return; }
   toast(_editingId ? '✅ Actualizado' : '✅ Entrada agregada');
-  cerrarModal('modalProd');
-  loadProduccion();
+  cerrarModal(cfg.modal);
+  loadProdPage(seccion);
   loadCounts();
 }
+
+// Confirmar eliminación de una sección específica
+function confirmarEliminarSeccion(seccion, id, desc) {
+  _deleteId = id + '_prod';
+  _deletingSeccion = seccion;
+  document.getElementById('confirmMsg').textContent = `¿Eliminar "${desc}" de ${seccion}? Esta acción no se puede deshacer.`;
+  document.getElementById('modalConfirm').classList.add('open');
+}
+
+// Variables para edición/eliminación con sección
+let _editingSeccion = 'procesos';
+let _deletingSeccion = 'procesos';
+
+// Compatibilidad legacy: abrirModalProduccion → usa sección activa
+function abrirModalProduccion(r = null) {
+  const active = document.querySelector('.page.active');
+  let sec = 'procesos';
+  if (active) {
+    const id = active.id;
+    if (id.includes('responsables')) sec = 'responsables';
+    else if (id.includes('lineas'))  sec = 'lineas';
+    else if (id.includes('especiales')) sec = 'especiales';
+  }
+  abrirSeccion(sec, r);
+}
+
+// Compatibilidad legacy: editarProduccion
+async function editarProduccion(id) {
+  const db = getClient(); if (!db) return;
+  const { data } = await db.from('produccion').select('*').eq('id', id).single();
+  if (data) abrirModalProduccion(data);
+}
+
+async function guardarProduccion() { guardarSeccion(_editingSeccion); }
 
 // ════════════════════════════════════════════════════
 //  ═══ NO REGISTRAR ═══
@@ -3039,8 +3188,14 @@ async function ejecutarEliminar() {
 
   toast('🗑 Eliminado correctamente');
   _deleteId = null;
-  const refreshers = { registros: loadRegistros, empleados: loadEmpleados, produccion: loadProduccion, noregistrar: loadNoRegistrar, 'prod-procesos': ()=>loadProdPage('procesos'), 'prod-responsables': ()=>loadProdPage('responsables'), 'prod-lineas': ()=>loadProdPage('lineas'), 'prod-especiales': ()=>loadProdPage('especiales') };
-  if (refreshers[table]) refreshers[table]();
+  // Recargar sección correcta según desde dónde se eliminó
+  if (table === 'produccion' && _deletingSeccion) {
+    loadProdPage(_deletingSeccion);
+    _deletingSeccion = 'procesos';
+  } else {
+    const refreshers = { registros: loadRegistros, empleados: loadEmpleados, noregistrar: loadNoRegistrar };
+    if (refreshers[table]) refreshers[table]();
+  }
   loadCounts();
 }
 
