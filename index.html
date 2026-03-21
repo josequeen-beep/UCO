@@ -4267,12 +4267,23 @@ function renderTabla(rows){
   }
 
   // ── Detectar duplicados y cambios de proceso ──────────────────
-  // Analiza TODOS los registros para no perder duplicados fuera del filtro.
-  // Campos de "proceso": línea(4), función(8), especie(10), producto(11), proceso(12), operación(13)
-  // Ignoramos hora de registro (r[23]) para comparar solo contenido.
+  // r[1]=fecha, r[5]=codigo, r[23]=created_at(hora registro), r[24]=id
+  // Campos proceso: r[3]=turno, r[4]=linea, r[8]=funcion, r[9]=cc,
+  //                 r[10]=especie, r[11]=producto, r[12]=proceso, r[13]=operacion
 
-  // Primero agrupar por codigo|fecha para encontrar quiénes aparecen más de una vez
-  const gruposCodFecha = {}; // "codigo|fecha" → [r, r, ...]
+  const _clavesProceso = r => [
+    String(r[3]||'').trim().toLowerCase(),
+    String(r[4]||'').trim().toLowerCase(),
+    String(r[8]||'').trim().toLowerCase(),
+    String(r[9]||'').trim().toLowerCase(),
+    String(r[10]||'').trim().toLowerCase(),
+    String(r[11]||'').trim().toLowerCase(),
+    String(r[12]||'').trim().toLowerCase(),
+    String(r[13]||'').trim().toLowerCase(),
+  ].join('|');
+
+  // Agrupar por codigo|fecha usando TODOS los registros
+  const gruposCodFecha = {};
   todosRegistros.forEach(r => {
     const fecha = String(r[1]||'').substring(0,10);
     const cod   = String(r[5]||'').trim().toLowerCase();
@@ -4282,35 +4293,48 @@ function renderTabla(rows){
     gruposCodFecha[k].push(r);
   });
 
-  // Para cada fila determinar su tipo: 'ok' | 'duplicado' | 'cambio_proceso'
-  // Claves de proceso para comparar (sin hora de registro)
-  const _clavesProceso = r => [
-    String(r[3]||'').trim().toLowerCase(),  // turno
-    String(r[4]||'').trim().toLowerCase(),  // linea
-    String(r[8]||'').trim().toLowerCase(),  // funcion
-    String(r[9]||'').trim().toLowerCase(),  // centro_costo
-    String(r[10]||'').trim().toLowerCase(), // especie
-    String(r[11]||'').trim().toLowerCase(), // producto
-    String(r[12]||'').trim().toLowerCase(), // proceso
-    String(r[13]||'').trim().toLowerCase(), // operacion
-  ].join('|');
-
-  // Mapa rowId → tipo de alerta
-  const _tipoFila = {}; // rowId → 'duplicado' | 'cambio_proceso'
+  // Mapa id → tipo usando created_at para ordenar
+  const _tipoFila = {};
   Object.values(gruposCodFecha).forEach(grupo => {
-    if(grupo.length < 2) return; // solo 1 registro → sin problema
+    if(grupo.length < 2) return;
+    // Ordenar por hora de registro (created_at = r[23])
+    grupo.sort((a,b) => {
+      const ca = String(a[23]||''), cb = String(b[23]||'');
+      return ca < cb ? -1 : ca > cb ? 1 : 0;
+    });
     const claves = grupo.map(r => _clavesProceso(r));
     const todosIguales = claves.every(c => c === claves[0]);
-    grupo.forEach(r => {
-      const id = String(r[24]||'');
-      _tipoFila[id] = todosIguales ? 'duplicado' : 'cambio_proceso';
-    });
+    if(todosIguales) {
+      // Todos idénticos: primero = normal, resto = duplicado
+      grupo.forEach((r,i) => {
+        const id = String(r[24]||'');
+        _tipoFila[id] = i === 0 ? null : 'duplicado'; // primero no marca
+      });
+    } else {
+      // Primero (más antiguo) = original → sin badge
+      const claveOriginal = claves[0];
+      _tipoFila[String(grupo[0][24]||'')] = null;
+      let nCambio = 1;
+      const mapaClaves = { [claveOriginal]: 0 };
+      for(let i = 1; i < grupo.length; i++){
+        const clave = claves[i];
+        const id = String(grupo[i][24]||'');
+        if(clave === claveOriginal){
+          _tipoFila[id] = 'duplicado';
+        } else {
+          if(!(clave in mapaClaves)) mapaClaves[clave] = nCambio++;
+          _tipoFila[id] = 'cambio_' + Math.min(mapaClaves[clave], 5);
+        }
+      }
+    }
   });
 
-  const _getTipoFila = r => _tipoFila[String(r[24]||'')] || null;
+  const _getTipoFila = r => _tipoFila[String(r[24]||'')] ?? null;
 
-  const dupIcon       = '<svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a7 7 0 100 14A7 7 0 008 1zm.75 4a.75.75 0 00-1.5 0v3.25l-1.5 1.5a.75.75 0 001.06 1.06l1.72-1.72A.75.75 0 008.75 8.5V5z"/></svg>';
-  const cambioIcon    = '<svg viewBox="0 0 16 16" fill="currentColor"><path d="M1 8a7 7 0 1 0 14 0A7 7 0 0 0 1 8zm7-3.5a.75.75 0 0 1 .75.75v3.19l1.72 1.72a.75.75 0 1 1-1.06 1.06L7.47 9.28A.75.75 0 0 1 7.25 8.5v-3.25A.75.75 0 0 1 8 4.5z"/></svg>';
+  const dupIcon    = '<svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a7 7 0 100 14A7 7 0 008 1zm.75 4a.75.75 0 00-1.5 0v3.25l-1.5 1.5a.75.75 0 001.06 1.06l1.72-1.72A.75.75 0 008.75 8.5V5z"/></svg>';
+  const cambioIcon = '<svg viewBox="0 0 16 16" fill="currentColor"><path d="M1 8a7 7 0 1 0 14 0A7 7 0 0 0 1 8zm7-3.5a.75.75 0 0 1 .75.75v3.19l1.72 1.72a.75.75 0 1 1-1.06 1.06L7.47 9.28A.75.75 0 0 1 7.25 8.5v-3.25A.75.75 0 0 1 8 4.5z"/></svg>';
+  const _labelCambio = { 'cambio_1':'Cambio proceso 1','cambio_2':'Cambio proceso 2',
+    'cambio_3':'Cambio proceso 3','cambio_4':'Cambio proceso 4','cambio_5':'Cambio proceso 5' };
 
   // Compat: esDuplicado sigue funcionando para código legacy
   const esDuplicado = r => {
@@ -4367,12 +4391,11 @@ function renderTabla(rows){
 
     if(tipoFila === 'duplicado'){
       trClass = ' class="row-duplicado' + (ausClass?' '+ausClass:'') + '"';
-      dupCell = `<td title="Mismo empleado registrado más de una vez con información idéntica">
-        <span class="dup-badge dup-badge-igual">${dupIcon} Duplicado</span></td>`;
-    } else if(tipoFila === 'cambio_proceso'){
+      dupCell = `<td title="Registro duplicado — misma información"><span class="dup-badge dup-badge-igual">${dupIcon} Duplicado</span></td>`;
+    } else if(tipoFila && tipoFila.startsWith('cambio_')){
       trClass = ' class="row-cambio-proceso' + (ausClass?' '+ausClass:'') + '"';
-      dupCell = `<td title="Mismo empleado registrado más de una vez con diferente proceso/línea/función">
-        <span class="dup-badge dup-badge-cambio">${cambioIcon} Cambio proceso</span></td>`;
+      const labelCambio = _labelCambio[tipoFila] || 'Cambio proceso';
+      dupCell = `<td title="Cambio de proceso detectado"><span class="dup-badge dup-badge-cambio">${cambioIcon} ${labelCambio}</span></td>`;
     } else {
       trClass = ausClass ? ' class="'+ausClass+'"' : '';
       dupCell = ausPill ? `<td>${ausPill}</td>` : '<td></td>';
