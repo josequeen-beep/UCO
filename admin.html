@@ -665,6 +665,14 @@ body {
 .turno-dup-banner{background:rgba(224,82,82,.1);border:1.5px solid rgba(224,82,82,.4);border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:12px;color:#c0392b;display:none}
 .turno-dup-banner.visible{display:flex;align-items:center;gap:8px}
 .turno-col-count{font-size:11px;font-weight:400;opacity:.7;margin-left:auto}
+
+/* ── TABS PRODUCCIÓN ── */
+.prod-tabs{display:flex;gap:4px;border-bottom:2px solid var(--border);padding-bottom:0}
+.prod-tab{padding:8px 16px;border:none;border-radius:8px 8px 0 0;cursor:pointer;font-size:12px;font-weight:600;
+  background:transparent;color:var(--muted);transition:all .15s;border-bottom:2px solid transparent;margin-bottom:-2px}
+.prod-tab:hover{background:var(--surface2);color:var(--text)}
+.prod-tab.active{background:var(--surface2);color:var(--accent);border-bottom:2px solid var(--accent)}
+.prod-tab-content{display:table}
 </style>
 </head>
 <body>
@@ -1014,7 +1022,7 @@ body {
       <div class="page-header">
         <div>
           <h1>Catálogo de Producción</h1>
-          <p>Especies, productos, procesos, operaciones, responsables y líneas</p>
+          <p>Procesos · Responsables · Líneas · Líneas Especiales</p>
         </div>
         <div class="page-header-actions">
           <button class="btn btn-secondary" onclick="loadProduccion()">🔄 Recargar</button>
@@ -1025,32 +1033,85 @@ body {
           <button class="btn btn-primary" onclick="abrirModalProduccion()">＋ Nueva entrada</button>
         </div>
       </div>
-      <div class="table-area">
-        <div class="toolbar">
-          <input class="search-input" id="prodSearch" placeholder="🔍 Buscar especie, producto, responsable..." oninput="debounceProd()">
+
+      <!-- Toolbar búsqueda + tabs -->
+      <div class="toolbar" style="flex-direction:column;align-items:stretch;gap:10px">
+        <div style="display:flex;gap:10px;align-items:center">
+          <input class="search-input" id="prodSearch" placeholder="🔍 Buscar en todo el catálogo..." oninput="debounceProd()" style="flex:1">
           <span class="count-badge" id="prodCountBadge">— entradas</span>
         </div>
+        <!-- Tabs -->
+        <div class="prod-tabs" id="prodTabs">
+          <button class="prod-tab active" data-tab="procesos"    onclick="setProdTab('procesos')">🐟 Procesos</button>
+          <button class="prod-tab"        data-tab="responsables" onclick="setProdTab('responsables')">👤 Responsables</button>
+          <button class="prod-tab"        data-tab="lineas"       onclick="setProdTab('lineas')">🏭 Líneas</button>
+          <button class="prod-tab"        data-tab="especiales"   onclick="setProdTab('especiales')">⭐ Líneas Especiales</button>
+        </div>
+      </div>
+
+      <div class="table-area" style="margin-top:0">
         <div class="data-table-wrap" style="overflow-x:auto">
-          <table class="data-table" style="min-width:1200px">
-            <thead>
-              <tr>
-                <th style="width:34px;text-align:center;padding:6px"></th>
-                <th style="width:80px">Acciones</th>
-                <th onclick="sortProd('especie')"        style="cursor:pointer;user-select:none" id="thp-especie">Especie <span id="arr-especie">↕</span></th>
-                <th onclick="sortProd('funcion')"        style="cursor:pointer;user-select:none" id="thp-funcion">Función <span id="arr-funcion">↕</span></th>
-                <th onclick="sortProd('producto')"       style="cursor:pointer;user-select:none" id="thp-producto">Producto <span id="arr-producto">↕</span></th>
-                <th onclick="sortProd('proceso')"        style="cursor:pointer;user-select:none" id="thp-proceso">Proceso <span id="arr-proceso">↕</span></th>
-                <th onclick="sortProd('operacion')"      style="cursor:pointer;user-select:none" id="thp-operacion">Operación <span id="arr-operacion">↕</span></th>
-                <th onclick="sortProd('responsable')"    style="cursor:pointer;user-select:none" id="thp-responsable">Responsable <span id="arr-responsable">↕</span></th>
-                <th onclick="sortProd('linea')"          style="cursor:pointer;user-select:none" id="thp-linea">Línea <span id="arr-linea">↕</span></th>
-                <th onclick="sortProd('linea_especial')" style="cursor:pointer;user-select:none" id="thp-linea_especial">Línea Especial <span id="arr-linea_especial">↕</span></th>
-                <th onclick="sortProd('funcion_especial')" style="cursor:pointer;user-select:none" id="thp-funcion_especial">Función Especial <span id="arr-funcion_especial">↕</span></th>
-              </tr>
-            </thead>
-            <tbody id="tbodyProd">
-              <tr class="loading-row"><td colspan="8"><span class="spinner"></span>Cargando…</td></tr>
+
+          <!-- TAB 1: PROCESOS — Especie, Función, Producto, Proceso, Operación -->
+          <table class="data-table prod-tab-content" id="prodTabProcesos" style="min-width:900px">
+            <thead><tr>
+              <th style="width:34px;text-align:center;padding:6px"></th>
+              <th style="width:80px">Acciones</th>
+              <th onclick="sortProd('especie')"   style="cursor:pointer;user-select:none" id="thp-especie">Especie <span id="arr-especie">↕</span></th>
+              <th onclick="sortProd('funcion')"   style="cursor:pointer;user-select:none" id="thp-funcion">Función <span id="arr-funcion">↕</span></th>
+              <th onclick="sortProd('producto')"  style="cursor:pointer;user-select:none" id="thp-producto">Producto <span id="arr-producto">↕</span></th>
+              <th onclick="sortProd('proceso')"   style="cursor:pointer;user-select:none" id="thp-proceso">Proceso <span id="arr-proceso">↕</span></th>
+              <th onclick="sortProd('operacion')" style="cursor:pointer;user-select:none" id="thp-operacion">Operación <span id="arr-operacion">↕</span></th>
+            </tr></thead>
+            <tbody id="tbodyProdProcesos">
+              <tr class="loading-row"><td colspan="7"><span class="spinner"></span>Cargando…</td></tr>
             </tbody>
           </table>
+
+          <!-- TAB 2: RESPONSABLES -->
+          <table class="data-table prod-tab-content" id="prodTabResponsables" style="display:none;min-width:500px">
+            <thead><tr>
+              <th style="width:34px;text-align:center;padding:6px"></th>
+              <th style="width:80px">Acciones</th>
+              <th onclick="sortProd('responsable')" style="cursor:pointer;user-select:none" id="thp-responsable">Responsable <span id="arr-responsable">↕</span></th>
+              <th onclick="sortProd('especie')"     style="cursor:pointer;user-select:none">Especie</th>
+              <th onclick="sortProd('producto')"    style="cursor:pointer;user-select:none">Producto</th>
+            </tr></thead>
+            <tbody id="tbodyProdResponsables">
+              <tr class="loading-row"><td colspan="5"><span class="spinner"></span>Cargando…</td></tr>
+            </tbody>
+          </table>
+
+          <!-- TAB 3: LÍNEAS -->
+          <table class="data-table prod-tab-content" id="prodTabLineas" style="display:none;min-width:500px">
+            <thead><tr>
+              <th style="width:34px;text-align:center;padding:6px"></th>
+              <th style="width:80px">Acciones</th>
+              <th onclick="sortProd('linea')" style="cursor:pointer;user-select:none" id="thp-linea">Línea <span id="arr-linea">↕</span></th>
+              <th onclick="sortProd('especie')"  style="cursor:pointer;user-select:none">Especie</th>
+              <th onclick="sortProd('producto')" style="cursor:pointer;user-select:none">Producto</th>
+              <th onclick="sortProd('proceso')"  style="cursor:pointer;user-select:none">Proceso</th>
+            </tr></thead>
+            <tbody id="tbodyProdLineas">
+              <tr class="loading-row"><td colspan="6"><span class="spinner"></span>Cargando…</td></tr>
+            </tbody>
+          </table>
+
+          <!-- TAB 4: LÍNEAS ESPECIALES -->
+          <table class="data-table prod-tab-content" id="prodTabEspeciales" style="display:none;min-width:600px">
+            <thead><tr>
+              <th style="width:34px;text-align:center;padding:6px"></th>
+              <th style="width:80px">Acciones</th>
+              <th onclick="sortProd('linea_especial')"   style="cursor:pointer;user-select:none" id="thp-linea_especial">Línea Especial <span id="arr-linea_especial">↕</span></th>
+              <th onclick="sortProd('funcion_especial')" style="cursor:pointer;user-select:none" id="thp-funcion_especial">Función Especial <span id="arr-funcion_especial">↕</span></th>
+              <th onclick="sortProd('especie')"          style="cursor:pointer;user-select:none">Especie</th>
+              <th onclick="sortProd('producto')"         style="cursor:pointer;user-select:none">Producto</th>
+            </tr></thead>
+            <tbody id="tbodyProdEspeciales">
+              <tr class="loading-row"><td colspan="6"><span class="spinner"></span>Cargando…</td></tr>
+            </tbody>
+          </table>
+
         </div>
         <div class="pagination" id="prodPagination"></div>
       </div>
@@ -2578,14 +2639,109 @@ async function guardarEmpleado() {
 let _prodSortCol = 'especie';
 let _prodSortAsc = true;
 
+// Tab activo de producción
+let _prodTabActivo = 'procesos';
+
+function setProdTab(tab) {
+  _prodTabActivo = tab;
+  // Actualizar tabs visuales
+  document.querySelectorAll('.prod-tab').forEach(b => {
+    b.classList.toggle('active', b.dataset.tab === tab);
+  });
+  // Mostrar/ocultar tablas
+  const tabMap = { procesos:'prodTabProcesos', responsables:'prodTabResponsables', lineas:'prodTabLineas', especiales:'prodTabEspeciales' };
+  Object.entries(tabMap).forEach(([k, id]) => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = k === tab ? 'table' : 'none';
+  });
+  // Re-renderizar solo el tab activo con datos ya cargados
+  if (window._prodDataCache) renderProdTabs(window._prodDataCache);
+}
+
+// Celda de acciones compartida para todas las tablas
+function _prodAcciones(r) {
+  return `<td style="text-align:center;padding:5px 4px">
+      <input type="checkbox" class="chk-prod" value="${r.id}"
+        onchange="actualizarSelProd()"
+        style="width:15px;height:15px;cursor:pointer;accent-color:#e05252;vertical-align:middle">
+    </td>
+    <td>
+      <div class="td-actions">
+        <button class="btn btn-secondary btn-sm" onclick="editarProduccion('${r.id}')">✏️</button>
+        <button class="btn btn-danger btn-sm" onclick="confirmarEliminar('${r.id}_prod','${esc(r.especie||'')} / ${esc(r.producto||'')}')">🗑</button>
+      </div>
+    </td>`;
+}
+
+function renderProdTabs(data) {
+  const vacio = (cols) => `<tr><td colspan="${cols}"><div class="empty-state"><div class="ei">🏭</div><p>Sin datos</p></div></td></tr>`;
+
+  // TAB 1 — Procesos: Especie, Función, Producto, Proceso, Operación
+  const tbodyProc = document.getElementById('tbodyProdProcesos');
+  if (tbodyProc) {
+    tbodyProc.innerHTML = data.length ? data.map(r => `<tr id="prodfila-${r.id}">
+      ${_prodAcciones(r)}
+      <td>${esc(r.especie)}</td>
+      <td>${esc(r.funcion)}</td>
+      <td>${esc(r.producto)}</td>
+      <td>${esc(r.proceso)}</td>
+      <td>${esc(r.operacion)}</td>
+    </tr>`).join('') : vacio(7);
+  }
+
+  // TAB 2 — Responsables
+  const tbodyResp = document.getElementById('tbodyProdResponsables');
+  if (tbodyResp) {
+    // Filtrar solo filas con responsable
+    const conResp = data.filter(r => r.responsable);
+    tbodyResp.innerHTML = conResp.length ? conResp.map(r => `<tr id="prodfila-resp-${r.id}">
+      ${_prodAcciones(r)}
+      <td><strong>${esc(r.responsable)}</strong></td>
+      <td>${esc(r.especie)}</td>
+      <td>${esc(r.producto)}</td>
+    </tr>`).join('') : vacio(5);
+  }
+
+  // TAB 3 — Líneas
+  const tbodyLin = document.getElementById('tbodyProdLineas');
+  if (tbodyLin) {
+    const conLinea = data.filter(r => r.linea);
+    tbodyLin.innerHTML = conLinea.length ? conLinea.map(r => `<tr id="prodfila-lin-${r.id}">
+      ${_prodAcciones(r)}
+      <td><strong>${esc(r.linea)}</strong></td>
+      <td>${esc(r.especie)}</td>
+      <td>${esc(r.producto)}</td>
+      <td>${esc(r.proceso)}</td>
+    </tr>`).join('') : vacio(6);
+  }
+
+  // TAB 4 — Líneas Especiales
+  const tbodyEsp = document.getElementById('tbodyProdEspeciales');
+  if (tbodyEsp) {
+    const conEsp = data.filter(r => r.linea_especial || r.funcion_especial);
+    tbodyEsp.innerHTML = conEsp.length ? conEsp.map(r => `<tr id="prodfila-esp-${r.id}">
+      ${_prodAcciones(r)}
+      <td><strong>${esc(r.linea_especial)}</strong></td>
+      <td>${esc(r.funcion_especial)}</td>
+      <td>${esc(r.especie)}</td>
+      <td>${esc(r.producto)}</td>
+    </tr>`).join('') : vacio(6);
+  }
+
+  actualizarSelProd();
+}
+
 async function loadProduccion() {
   const db = getClient(); if (!db) return;
-  const tbody = document.getElementById('tbodyProd');
-  tbody.innerHTML = '<tr class="loading-row"><td colspan="11"><span class="spinner"></span>Cargando…</td></tr>';
+  // Mostrar loading en el tab activo
+  const loadingHtml = (n) => `<tr class="loading-row"><td colspan="${n}"><span class="spinner"></span>Cargando…</td></tr>`;
+  ['tbodyProdProcesos','tbodyProdResponsables','tbodyProdLineas','tbodyProdEspeciales'].forEach((id,i) => {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = loadingHtml([7,5,6,6][i]);
+  });
 
   const search = document.getElementById('prodSearch').value.trim();
 
-  // Traer TODOS los registros sin paginación (limit 2000)
   let q = db.from('produccion').select('*', { count:'exact' })
     .order(_prodSortCol, { ascending: _prodSortAsc })
     .limit(2000);
@@ -2594,48 +2750,18 @@ async function loadProduccion() {
   const { data, error, count } = await q;
   if (error) { toast('Error: '+error.message,'error'); return; }
 
+  // Guardar en caché local para cambio de tabs sin re-query
+  window._prodDataCache = data || [];
   document.getElementById('prodCountBadge').textContent = `${count ?? 0} entradas`;
 
-  // Actualizar flechas
+  // Actualizar flechas de orden
   ['especie','funcion','producto','proceso','operacion','responsable','linea','linea_especial','funcion_especial'].forEach(col => {
     const el = document.getElementById('arr-'+col);
     if (!el) return;
-    if (col === _prodSortCol) el.textContent = _prodSortAsc ? '↑' : '↓';
-    else el.textContent = '↕';
+    el.textContent = col === _prodSortCol ? (_prodSortAsc ? '↑' : '↓') : '↕';
   });
 
-  if (!data?.length) {
-    tbody.innerHTML = '<tr><td colspan="11"><div class="empty-state"><div class="ei">🏭</div><p>Sin datos de producción</p></div></td></tr>';
-    return;
-  }
-
-  tbody.innerHTML = data.map(r => `
-    <tr id="prodfila-${r.id}">
-      <td style="text-align:center;padding:5px 4px">
-        <input type="checkbox" class="chk-prod" value="${r.id}"
-          onchange="actualizarSelProd()"
-          style="width:15px;height:15px;cursor:pointer;accent-color:#e05252;vertical-align:middle;appearance:none;-webkit-appearance:none;border:2px solid #c0c8d4;border-radius:4px;background:#fff;display:inline-flex;align-items:center;justify-content:center">
-      </td>
-      <td>
-        <div class="td-actions">
-          <button class="btn btn-secondary btn-sm" onclick="editarProduccion('${r.id}')">✏️</button>
-          <button class="btn btn-danger btn-sm" onclick="confirmarEliminar('${r.id}_prod','${esc(r.especie)} / ${esc(r.producto)}')">🗑</button>
-        </div>
-      </td>
-      <td>${esc(r.especie)}</td>
-      <td>${esc(r.funcion)}</td>
-      <td>${esc(r.producto)}</td>
-      <td>${esc(r.proceso)}</td>
-      <td>${esc(r.operacion)}</td>
-      <td>${esc(r.responsable)}</td>
-      <td>${esc(r.linea)}</td>
-      <td>${esc(r.linea_especial)}</td>
-      <td>${esc(r.funcion_especial)}</td>
-    </tr>`).join('');
-
-  actualizarSelProd();
-
-  // Sin paginación — ocultar paginador
+  renderProdTabs(window._prodDataCache);
   document.getElementById('prodPagination').innerHTML = '';
 }
 
