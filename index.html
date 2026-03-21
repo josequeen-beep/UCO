@@ -1473,10 +1473,13 @@ input.chk-reg:hover:not(:checked){ border-color:#e05252; }
 .badge-si{background:rgba(0,198,162,.12);color:#0d7a62;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:700}
 .badge-no{background:rgba(200,200,200,.2);color:var(--muted);padding:2px 8px;border-radius:20px;font-size:11px}
 
-/* ══ Fila duplicada en el mismo día ══ */
+/* ══ Fila duplicada / cambio de proceso ══ */
 .row-duplicado{background:rgba(224,82,82,.10)!important;outline:1.5px solid rgba(224,82,82,.35)}
 .row-duplicado:hover{background:rgba(224,82,82,.17)!important}
 body.noche-mode .row-duplicado{background:rgba(255,80,80,.08)!important;outline:1.5px solid rgba(255,100,100,.3)}
+.row-cambio-proceso{background:rgba(255,152,0,.10)!important;outline:1.5px solid rgba(255,152,0,.4)}
+.row-cambio-proceso:hover{background:rgba(255,152,0,.17)!important}
+body.noche-mode .row-cambio-proceso{background:rgba(255,140,0,.08)!important;outline:1.5px solid rgba(255,160,0,.3)}
 /* Resaltado por estado de ausencia */
 .row-vacacion{background:rgba(0,148,212,.08)!important;border-left:3px solid #0094d4!important}
 .row-vacacion:hover{background:rgba(0,148,212,.14)!important}
@@ -1504,6 +1507,8 @@ body.noche-mode .row-duplicado{background:rgba(255,80,80,.08)!important;outline:
   border-radius:20px;font-size:10px;font-weight:700;padding:2px 8px;
   cursor:default;white-space:nowrap}
 .dup-badge svg{width:11px;height:11px;flex-shrink:0}
+.dup-badge-igual{background:rgba(224,82,82,.15);color:#c0392b;border-color:rgba(224,82,82,.3)}
+.dup-badge-cambio{background:rgba(255,152,0,.15);color:#c85000;border:1px solid rgba(255,152,0,.4)}
 .empty-state{text-align:center;padding:50px 20px;color:var(--muted)}
 .empty-state .ei{font-size:44px;margin-bottom:10px}
 
@@ -2490,7 +2495,7 @@ body.noche-mode .modal-field input,body.noche-mode .modal-field select{color-sch
       <span class="registros-count" id="regCount">0 registros</span>
       <div class="reg-btns">
         <button class="btn btn-primary btn-sm" onclick="_registrosCargados=false;cargarRegistros()">↻ Actualizar</button>
-        <button class="btn btn-pdf btn-sm" onclick="exportarPDF()">📄 Exportar PDF</button>
+
         <button class="btn btn-sm" onclick="exportarRegistrosExcel()"
           style="background:linear-gradient(135deg,#1a7a3a,#27ae60);color:#fff;font-weight:700"
           title="Exporta en Excel los registros del filtro actual">🟢 Excel</button>
@@ -4261,29 +4266,57 @@ function renderTabla(rows){
     return;
   }
 
-  // ── Detectar duplicados: mismo código O mismo nombre, en la misma fecha ──
-  // Se analiza sobre TODOS los registros (no solo los filtrados) para no perder
-  // duplicados que hayan quedado fuera del filtro activo.
-  const contCodigo = {};   // "codigo|fecha" → count
-  const contNombre = {};   // "nombre_lower|fecha" → count
-  todosRegistros.forEach(r=>{
+  // ── Detectar duplicados y cambios de proceso ──────────────────
+  // Analiza TODOS los registros para no perder duplicados fuera del filtro.
+  // Campos de "proceso": línea(4), función(8), especie(10), producto(11), proceso(12), operación(13)
+  // Ignoramos hora de registro (r[23]) para comparar solo contenido.
+
+  // Primero agrupar por codigo|fecha para encontrar quiénes aparecen más de una vez
+  const gruposCodFecha = {}; // "codigo|fecha" → [r, r, ...]
+  todosRegistros.forEach(r => {
     const fecha = String(r[1]||'').substring(0,10);
     const cod   = String(r[5]||'').trim().toLowerCase();
-    const nom   = String(r[6]||'').trim().toLowerCase();
-    if(cod && fecha){ const k=cod+'|'+fecha; contCodigo[k]=(contCodigo[k]||0)+1; }
-    if(nom && fecha){ const k=nom+'|'+fecha; contNombre[k]=(contNombre[k]||0)+1; }
+    if(!cod || !fecha) return;
+    const k = cod + '|' + fecha;
+    if(!gruposCodFecha[k]) gruposCodFecha[k] = [];
+    gruposCodFecha[k].push(r);
   });
 
-  const esDuplicado = r => {
-    const fecha = String(r[1]||'').substring(0,10);
-    const cod   = String(r[5]||'').trim().toLowerCase();
-    const nom   = String(r[6]||'').trim().toLowerCase();
-    const dupCod = cod && fecha && (contCodigo[cod+'|'+fecha]||0) > 1;
-    const dupNom = nom && fecha && (contNombre[nom+'|'+fecha]||0) > 1;
-    return { dup: dupCod || dupNom, porCodigo: dupCod, porNombre: dupNom };
-  };
+  // Para cada fila determinar su tipo: 'ok' | 'duplicado' | 'cambio_proceso'
+  // Claves de proceso para comparar (sin hora de registro)
+  const _clavesProceso = r => [
+    String(r[3]||'').trim().toLowerCase(),  // turno
+    String(r[4]||'').trim().toLowerCase(),  // linea
+    String(r[8]||'').trim().toLowerCase(),  // funcion
+    String(r[9]||'').trim().toLowerCase(),  // centro_costo
+    String(r[10]||'').trim().toLowerCase(), // especie
+    String(r[11]||'').trim().toLowerCase(), // producto
+    String(r[12]||'').trim().toLowerCase(), // proceso
+    String(r[13]||'').trim().toLowerCase(), // operacion
+  ].join('|');
 
-  const dupIcon = '<svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a7 7 0 100 14A7 7 0 008 1zm.75 4a.75.75 0 00-1.5 0v3.25l-1.5 1.5a.75.75 0 001.06 1.06l1.72-1.72A.75.75 0 008.75 8.5V5z"/></svg>';
+  // Mapa rowId → tipo de alerta
+  const _tipoFila = {}; // rowId → 'duplicado' | 'cambio_proceso'
+  Object.values(gruposCodFecha).forEach(grupo => {
+    if(grupo.length < 2) return; // solo 1 registro → sin problema
+    const claves = grupo.map(r => _clavesProceso(r));
+    const todosIguales = claves.every(c => c === claves[0]);
+    grupo.forEach(r => {
+      const id = String(r[24]||'');
+      _tipoFila[id] = todosIguales ? 'duplicado' : 'cambio_proceso';
+    });
+  });
+
+  const _getTipoFila = r => _tipoFila[String(r[24]||'')] || null;
+
+  const dupIcon       = '<svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a7 7 0 100 14A7 7 0 008 1zm.75 4a.75.75 0 00-1.5 0v3.25l-1.5 1.5a.75.75 0 001.06 1.06l1.72-1.72A.75.75 0 008.75 8.5V5z"/></svg>';
+  const cambioIcon    = '<svg viewBox="0 0 16 16" fill="currentColor"><path d="M1 8a7 7 0 1 0 14 0A7 7 0 0 0 1 8zm7-3.5a.75.75 0 0 1 .75.75v3.19l1.72 1.72a.75.75 0 1 1-1.06 1.06L7.47 9.28A.75.75 0 0 1 7.25 8.5v-3.25A.75.75 0 0 1 8 4.5z"/></svg>';
+
+  // Compat: esDuplicado sigue funcionando para código legacy
+  const esDuplicado = r => {
+    const tipo = _getTipoFila(r);
+    return { dup: tipo !== null, porCodigo: tipo !== null, porNombre: false };
+  };
 
   const fmtBool=v=>v==='Sí'?'<span class="badge-si">✓ Sí</span>':'<span class="badge-no">—</span>';
   const fmtFechaSolo = v => {
@@ -4329,17 +4362,21 @@ function renderTabla(rows){
       ausClass = 'row-perm-judicial';
       ausPill  = '<span class="ausencia-pill pill-pjud">⚖️ Perm. Judicial</span>';
     }
-    const {dup, porCodigo, porNombre} = esDuplicado(r);
-    const trClass = dup
-      ? ' class="row-duplicado' + (ausClass?' '+ausClass:'') + '"'
-      : ausClass ? ' class="'+ausClass+'"' : '';
-    const motivo  = porCodigo && porNombre ? 'código y nombre'
-                  : porCodigo ? 'código'
-                  : porNombre ? 'nombre' : '';
-    const dupCell = dup
-      ? `<td title="Registro duplicado por ${motivo} en esta fecha"><span class="dup-badge">${dupIcon} Duplicado</span></td>`
-      : ausPill ? `<td>${ausPill}</td>`
-      : '<td></td>';
+    const tipoFila = _getTipoFila(r);
+    let trClass = '', dupCell = '';
+
+    if(tipoFila === 'duplicado'){
+      trClass = ' class="row-duplicado' + (ausClass?' '+ausClass:'') + '"';
+      dupCell = `<td title="Mismo empleado registrado más de una vez con información idéntica">
+        <span class="dup-badge dup-badge-igual">${dupIcon} Duplicado</span></td>`;
+    } else if(tipoFila === 'cambio_proceso'){
+      trClass = ' class="row-cambio-proceso' + (ausClass?' '+ausClass:'') + '"';
+      dupCell = `<td title="Mismo empleado registrado más de una vez con diferente proceso/línea/función">
+        <span class="dup-badge dup-badge-cambio">${cambioIcon} Cambio proceso</span></td>`;
+    } else {
+      trClass = ausClass ? ' class="'+ausClass+'"' : '';
+      dupCell = ausPill ? `<td>${ausPill}</td>` : '<td></td>';
+    }
 
     return `<tr${trClass} id="regfila-${rowId}">` +
       '<td style="text-align:center;padding:5px 4px;background:var(--card)">'+
