@@ -3585,7 +3585,7 @@ async function exportarRegistrosExcel() {
   var data = res.data || [];
   if (!data.length) { toast('No hay registros para exportar con los filtros actuales', 'warn'); return; }
 
-  // Encabezados exactamente como se muestran en el formulario de registro
+  // Encabezados
   var COLS = [
     { key: 'mes',                label: 'Mes'                   },
     { key: 'fecha',              label: 'Fecha'                  },
@@ -3612,37 +3612,85 @@ async function exportarRegistrosExcel() {
     { key: 'colacion_programado',label: 'Colación Programado'    },
   ];
 
+  // ── Clasificar registros ─────────────────────────────────────
+  var _grupoExp = {};
+  data.forEach(function(r) {
+    var fecha = String(r.fecha||'').substring(0,10);
+    var cod   = String(r.codigo||'').trim().toLowerCase();
+    if(!cod||!fecha) return;
+    var k = cod+'|'+fecha;
+    if(!_grupoExp[k]) _grupoExp[k]=[];
+    _grupoExp[k].push(r);
+  });
+  var _camposProceso = ['turno','linea','funcion','centro_costo','especie','producto','proceso','operacion'];
+  function _claveProcAdmin(r){ return _camposProceso.map(function(c){ return String(r[c]||'').trim().toLowerCase(); }).join('|'); }
+  var _tipoRegAdmin = new Map();
+  Object.values(_grupoExp).forEach(function(grupo){
+    if(grupo.length<2){ grupo.forEach(function(r){ _tipoRegAdmin.set(r,'normal'); }); return; }
+    var claves=grupo.map(function(r){ return _claveProcAdmin(r); });
+    var todosIguales=claves.every(function(c){ return c===claves[0]; });
+    if(todosIguales){ grupo.forEach(function(r){ _tipoRegAdmin.set(r,'duplicado'); }); }
+    else {
+      var mapaClaves={}, nCambio=1;
+      grupo.forEach(function(r,i){
+        var clave=claves[i];
+        if(!(clave in mapaClaves)) mapaClaves[clave]=nCambio++;
+        _tipoRegAdmin.set(r,'cambio_'+Math.min(mapaClaves[clave],5));
+      });
+    }
+  });
+
+  // Separar: normales/duplicados primero (A→Z nombre), cambios al final
+  var _normales = data.filter(function(r){ var t=_tipoRegAdmin.get(r)||'normal'; return t==='normal'||t==='duplicado'; });
+  var _cambios  = data.filter(function(r){ var t=_tipoRegAdmin.get(r)||'normal'; return t.startsWith('cambio_'); });
+  function _sortNomAdmin(a,b){
+    var cmp=String(a.nombre||'').trim().localeCompare(String(b.nombre||'').trim(),'es');
+    return cmp!==0?cmp:String(a.fecha||'').localeCompare(String(b.fecha||''));
+  }
+  _normales.sort(_sortNomAdmin); _cambios.sort(_sortNomAdmin);
+  var dataOrdenada = _normales.concat(_cambios);
+
+  var _labelEstado = {
+    'normal':'','duplicado':'Duplicado',
+    'cambio_1':'Cambio proceso 1','cambio_2':'Cambio proceso 2',
+    'cambio_3':'Cambio proceso 3','cambio_4':'Cambio proceso 4','cambio_5':'Cambio proceso 5'
+  };
+
+  // Agregar columna Estado
+  var COLS_EXPORT = COLS.concat([{key:'_estado', label:'Estado'}]);
+
   function fmtVal(key, val) {
     if (val === null || val === undefined) return '';
-    // Timestamps → legible sin T ni Z
     if (typeof val === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(val)) {
       return val.replace('T', ' ').substring(0, 16);
     }
     return val;
   }
 
-  // Construir array 2D: encabezados + filas
-  var header = COLS.map(function(c) { return c.label; });
-  var rows = data.map(function(r) {
-    return COLS.map(function(c) { return fmtVal(c.key, r[c.key]); });
+  var header = COLS_EXPORT.map(function(c) { return c.label; });
+  var rows = dataOrdenada.map(function(r) {
+    var tipo = _tipoRegAdmin.get(r)||'normal';
+    return COLS_EXPORT.map(function(c) {
+      if(c.key==='_estado') return _labelEstado[tipo]||tipo;
+      return fmtVal(c.key, r[c.key]);
+    });
   });
 
   var ws = XLSX.utils.aoa_to_sheet([header].concat(rows));
 
-  // ── Ancho de columnas automático ──
-  ws['!cols'] = COLS.map(function(c, ci) {
+  // Ancho de columnas ajustado al contenido real
+  ws['!cols'] = COLS_EXPORT.map(function(c, ci) {
     var maxLen = c.label.length;
     rows.forEach(function(r) { var v = String(r[ci] || ''); if (v.length > maxLen) maxLen = v.length; });
-    return { wch: Math.min(Math.max(maxLen + 2, 10), 35) };
+    return { wch: Math.min(Math.max(maxLen + 2, 10), 40) };
   });
 
-  // ── Fijar primera fila (encabezados) ──
+  // Fijar primera fila
   ws['!freeze'] = { xSplit: 0, ySplit: 1, topLeftCell: 'A2', activePane: 'bottomLeft', state: 'frozen' };
 
   var wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Registros');
 
-  // Nombre del archivo con rango de fechas
   var sufijo = '';
   if (desde && hasta) sufijo = '_' + desde + '_a_' + hasta;
   else if (desde)     sufijo = '_desde_' + desde;
