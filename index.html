@@ -2669,12 +2669,13 @@ body.noche-mode .modal-field input,body.noche-mode .modal-field select{color-sch
         onchange="cargarDashboard()" oninput="cargarDashboard()">
       <input type="number" id="dashAnio" class="dash-semana-input" min="2020" max="2030" style="width:75px;text-align:center" placeholder="Año" onchange="cargarDashboard()" oninput="cargarDashboard()">
       <span class="dash-semana-rango" id="dashRango">—</span>
-      <select id="filtroTurnoDash" class="dash-semana-input" style="padding:5px 10px;min-width:110px" onchange="aplicarFiltroDash()">
+      <select id="filtroTurnoDash" class="dash-semana-input" style="padding:5px 10px;min-width:110px" onchange="this.dataset.userSet='1';aplicarFiltroDash()">
         <option value="">Todos los turnos</option>
         <option value="día">☀️ Día</option>
         <option value="tarde">🌅 Tarde</option>
         <option value="noche">🌙 Noche</option>
       </select>
+
       <button class="dash-btn-ref" onclick="cargarDashboard()">↻ Actualizar</button>
     </div>
   </div>
@@ -3010,25 +3011,17 @@ function setTurno(t){
   tg.style.boxShadow='0 0 0 2px rgba(61,186,126,.3)';
   tg.style.borderColor='#3dba7e';
   if(t==='Noche'){
-    // Guardar tema actual para restaurarlo al volver a Día
-    if(temaActual !== 'medianoche') _temaAntesDeTurno = temaActual;
-    aplicarTema('medianoche');
     document.body.classList.add('noche-mode');
     document.getElementById('desayunoProgramado').checked=false; toggleDesayuno(false);
     document.getElementById('aplicaDesayuno').checked=false; toggleAplicaDesayuno(false);
-    showToast('🌙 Turno Noche — entorno nocturno activado','success');
+    showToast('🌙 Turno Noche seleccionado','success');
   } else if(t==='Tarde'){
-    // Tarde: restaurar tema normal, sin modo nocturno
     document.body.classList.remove('noche-mode');
-    if(_temaAntesDeTurno){ aplicarTema(_temaAntesDeTurno); _temaAntesDeTurno=null; }
+    // Tarde: sin desayuno
+    document.getElementById('aplicaDesayuno').checked=false; toggleAplicaDesayuno(false);
     showToast('🌅 Turno Tarde seleccionado','success');
   } else {
-    // Restaurar tema anterior al volver a Día
     document.body.classList.remove('noche-mode');
-    if(_temaAntesDeTurno && _temaAntesDeTurno !== 'medianoche'){
-      aplicarTema(_temaAntesDeTurno);
-      _temaAntesDeTurno = null;
-    }
     document.getElementById('aplicaDesayuno').checked=true; toggleAplicaDesayuno(true);
     showToast('☀️ Turno Día activado','success');
   }
@@ -3036,17 +3029,22 @@ function setTurno(t){
 }
 
 function preRellenarHorasFiltro(t){
-  const hoy     = localDate(new Date());
-  const mañana  = localDate(new Date(Date.now()+86400000));
+  const hoy    = localDate(new Date());
+  const manana = localDate(new Date(Date.now()+86400000));
   if(t==='Día'){
     document.getElementById('filtroDesde').value     = hoy;
-    document.getElementById('filtroDesdeHora').value = '07:00';
+    document.getElementById('filtroDesdeHora').value = '08:00';
     document.getElementById('filtroHasta').value     = hoy;
-    document.getElementById('filtroHastaHora').value = '18:00';
+    document.getElementById('filtroHastaHora').value = '16:00';
+  } else if(t==='Tarde'){
+    document.getElementById('filtroDesde').value     = hoy;
+    document.getElementById('filtroDesdeHora').value = '17:00';
+    document.getElementById('filtroHasta').value     = manana;
+    document.getElementById('filtroHastaHora').value = '00:00';
   } else if(t==='Noche'){
     document.getElementById('filtroDesde').value     = hoy;
-    document.getElementById('filtroDesdeHora').value = '19:00';
-    document.getElementById('filtroHasta').value     = mañana;
+    document.getElementById('filtroDesdeHora').value = '20:30';
+    document.getElementById('filtroHasta').value     = manana;
     document.getElementById('filtroHastaHora').value = '06:00';
   }
   document.getElementById('filtroTurno').value = t;
@@ -3714,25 +3712,32 @@ function toggleProceso(checked){
   const ter=document.getElementById('procesoTermino');
   const badge=document.getElementById('badgeProceso');
   if(checked){
-    const f=getFecha(); // "yyyy-MM-dd"
-    const esNoche=turnoActual==='Noche';
-    if(esNoche){
-      // Noche: inicio fecha actual 20:20 — término fecha siguiente 06:00
-      ini.value=dtLocal(f,20,20);
-      // Calcular fecha siguiente
-      const d=new Date(f+'T12:00:00');
-      d.setDate(d.getDate()+1);
-      const fSig=localDate(d);
+    const f=getFecha();
+    const d=new Date(f+'T12:00:00');
+    d.setDate(d.getDate()+1);
+    const fSig=localDate(d);
+
+    if(turnoActual==='Noche'){
+      // Noche: 20:30 fecha actual → 06:00 día siguiente
+      ini.value=dtLocal(f,20,30);
       ter.value=dtLocal(fSig,6,0);
-      badge.innerHTML='🌙 Proceso 20:20 – 06:00 &nbsp;|&nbsp; Jornada estándar: <strong>9h 40m</strong>';
+      badge.innerHTML='🌙 Proceso 20:30 – 06:00 &nbsp;|&nbsp; Jornada: <strong>9h 30m</strong>';
       badge.classList.add('visible');
-      showToast('🌙 Proceso Noche: 20:20 → 06:00 (9h 40m)','success');
+      showToast('🌙 Turno Noche: 20:30 → 06:00','success');
+    } else if(turnoActual==='Tarde'){
+      // Tarde: 17:00 → 00:00 día siguiente
+      ini.value=dtLocal(f,17,0);
+      ter.value=dtLocal(fSig,0,0);
+      badge.innerHTML='🌅 Proceso 17:00 – 00:00 &nbsp;|&nbsp; Jornada: <strong>7 hrs</strong>';
+      badge.classList.add('visible');
+      showToast('🌅 Turno Tarde: 17:00 → 00:00','success');
     } else {
+      // Día: 08:00 → 16:00
       ini.value=dtLocal(f,8,0);
       ter.value=dtLocal(f,16,0);
-      badge.innerHTML='⚙️ Proceso 08:00 – 16:00 &nbsp;|&nbsp; Jornada estándar: <strong>8 hrs</strong>';
+      badge.innerHTML='☀️ Proceso 08:00 – 16:00 &nbsp;|&nbsp; Jornada: <strong>8 hrs</strong>';
       badge.classList.add('visible');
-      showToast('⚙️ Proceso Día: 08:00–16:00 (8 hrs)','success');
+      showToast('☀️ Turno Día: 08:00 → 16:00','success');
     }
   } else {
     ini.value=''; ter.value='';
@@ -3797,10 +3802,19 @@ function toggleColacion(checked){
   const badge=document.getElementById('badgeColacion');
   const txt=document.getElementById('badgeColTxt');
   if(checked){
-    const f=getFecha(),h=turnoActual==='Noche'?23:12;
-    ini.value=dtLocal(f,h,0); ter.value=dtLocal(f,h,30);
+    const f=getFecha();
+    let h=12, m=0, lbl='12:00–12:30', fechaCol=f;
+    if(turnoActual==='Noche'){
+      // Noche: cena 23:00–23:30 de la fecha actual
+      h=23; m=0; lbl='23:00–23:30';
+    } else if(turnoActual==='Tarde'){
+      // Tarde: cena 21:00–21:30 de la fecha actual
+      h=21; m=0; lbl='21:00–21:30';
+    }
+    // Colación Día: 12:00–12:30
+    ini.value=dtLocal(fechaCol,h,m);
+    ter.value=dtLocal(fechaCol,h,30);
     badge.classList.add('visible');
-    const lbl=h===23?'23:00–23:30':'12:00–12:30';
     txt.innerHTML='⏱ Colación '+lbl+' &nbsp;|&nbsp; Descuento: <strong>−30 min</strong>';
     showToast('🍽 Colación '+lbl+' (−30 min)','success');
   } else {
@@ -4771,7 +4785,19 @@ function fmtFechaCL(d){
 const DIAS_CORTOS=['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
 
 // ── Cargar Dashboard
+function _turnoSegunHora(){
+  const h = new Date().getHours();
+  if(h >= 8 && h < 17)  return 'día';
+  if(h >= 17 && h < 21) return 'tarde';
+  return 'noche';
+}
+
 async function cargarDashboard(){
+  // Autoseleccionar turno según hora si no hay selección previa
+  const selDash = document.getElementById('filtroTurnoDash');
+  if(selDash && !selDash.dataset.userSet) {
+    selDash.value = _turnoSegunHora();
+  }
   const si=document.getElementById('dashSemana');
   const sem=parseInt(si.value)||getNumSemana(new Date());
   si.value=sem;
