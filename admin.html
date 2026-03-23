@@ -5061,6 +5061,15 @@ async function loadAusentesAdmin() {
       return { emp: e, estado, estadoCls };
     });
 
+    // Ordenar: por estado A→Z, luego por nombre A→Z
+    var _ordenEstado = { 'Licencia Médica':0, 'Permiso Médico':1, 'Permiso Personal':2, 'Permiso Judicial':3, 'Vacaciones':4, 'Sin Registro':5 };
+    filas.sort(function(a, b) {
+      var oa = _ordenEstado[a.estado] !== undefined ? _ordenEstado[a.estado] : 99;
+      var ob = _ordenEstado[b.estado] !== undefined ? _ordenEstado[b.estado] : 99;
+      if (oa !== ob) return oa - ob;
+      return String(a.emp.nombre||'').localeCompare(String(b.emp.nombre||''), 'es');
+    });
+
     var listEl = document.getElementById('lista-ausentes-'+colId);
     var cntEl  = document.getElementById('cnt-ausentes-'+colId);
 
