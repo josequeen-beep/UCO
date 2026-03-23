@@ -757,6 +757,9 @@ body {
       <button class="sidebar-item" onclick="goPage('revision')">
         <span class="si-icon"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="1" width="12" height="14" rx="1.5"/><polyline points="5,8.5 7,10.5 11,6.5"/></svg></span> Revisión Asistencia
       </button>
+      <button class="sidebar-item" onclick="goPage('ausentes')">
+        <span class="si-icon"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="5" r="3"/><path d="M2 14c0-3.3 2.7-6 6-6s6 2.7 6 6"/><line x1="12" y1="3" x2="14" y2="3"/><line x1="13" y1="2" x2="13" y2="4"/></svg></span> Ausentes del Día
+      </button>
     </div>
     <div class="sidebar-section">
       <div class="sidebar-label">Sistema</div>
@@ -1198,6 +1201,58 @@ body {
             </tbody>
           </table>
         </div>
+      </div>
+    </div>
+
+    <!-- ══ AUSENTES DEL DÍA ══ -->
+    <div class="page" id="page-ausentes">
+      <div class="page-header">
+        <div><h1>Ausentes del Día</h1><p>Sin registro por turno — <span id="ausentesAdmin-fecha-label"></span></p></div>
+        <div class="page-header-actions">
+          <input type="date" class="form-input" id="ausentesAdmin-fecha" style="width:160px" onchange="loadAusentesAdmin()">
+          <button class="btn btn-secondary" onclick="loadAusentesAdmin()">🔄 Actualizar</button>
+        </div>
+      </div>
+
+      <!-- 3 columnas por turno -->
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;padding:4px 0">
+
+        <!-- Turno Día -->
+        <div style="background:var(--surface2);border-radius:12px;border:1.5px solid var(--border);overflow:hidden">
+          <div style="padding:10px 16px;background:rgba(255,213,80,.08);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px">
+            <svg viewBox="0 0 16 16" fill="none" stroke="#b07a00" stroke-width="1.5" style="width:15px;height:15px"><circle cx="8" cy="8" r="3"/><line x1="8" y1="1" x2="8" y2="2.5"/><line x1="8" y1="13.5" x2="8" y2="15"/><line x1="1" y1="8" x2="2.5" y2="8"/><line x1="13.5" y1="8" x2="15" y2="8"/></svg>
+            <span style="font-size:13px;font-weight:700;color:#b07a00">Turno Día</span>
+            <span class="si-count" id="cnt-ausentes-dia" style="margin-left:auto">—</span>
+          </div>
+          <div id="lista-ausentes-dia" style="max-height:520px;overflow-y:auto;padding:4px 0">
+            <div style="padding:20px;text-align:center;color:var(--muted);font-size:12px">Selecciona una fecha</div>
+          </div>
+        </div>
+
+        <!-- Turno Tarde -->
+        <div style="background:var(--surface2);border-radius:12px;border:1.5px solid var(--border);overflow:hidden">
+          <div style="padding:10px 16px;background:rgba(255,152,0,.08);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px">
+            <svg viewBox="0 0 16 16" fill="none" stroke="#c85000" stroke-width="1.5" style="width:15px;height:15px"><path d="M2 10a6 6 0 0 1 10.4-4"/><path d="M3 13h10"/></svg>
+            <span style="font-size:13px;font-weight:700;color:#c85000">Turno Tarde</span>
+            <span class="si-count" id="cnt-ausentes-tarde" style="margin-left:auto">—</span>
+          </div>
+          <div id="lista-ausentes-tarde" style="max-height:520px;overflow-y:auto;padding:4px 0">
+            <div style="padding:20px;text-align:center;color:var(--muted);font-size:12px">Selecciona una fecha</div>
+          </div>
+        </div>
+
+        <!-- Turno Noche -->
+        <div style="background:var(--surface2);border-radius:12px;border:1.5px solid var(--border);overflow:hidden">
+          <div style="padding:10px 16px;background:rgba(56,189,248,.07);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px">
+            <svg viewBox="0 0 16 16" fill="none" stroke="#0284c7" stroke-width="1.5" style="width:15px;height:15px"><path d="M13 10A6 6 0 0 1 6 3a6 6 0 1 0 7 7z"/></svg>
+            <span style="font-size:13px;font-weight:700;color:#0284c7">Turno Noche</span>
+            <span class="si-count" id="cnt-ausentes-noche" style="margin-left:auto">—</span>
+          </div>
+          <div id="lista-ausentes-noche" style="max-height:520px;overflow-y:auto;padding:4px 0">
+            <div style="padding:20px;text-align:center;color:var(--muted);font-size:12px">Selecciona una fecha</div>
+          </div>
+        </div>
+
       </div>
     </div>
 
@@ -2069,6 +2124,7 @@ function goPage(name) {
     'empleados-tarde': () => loadEmpleados('Tarde'),
     'empleados-noche': () => loadEmpleados('Noche'),
     'gestion-turnos':  loadGestionTurnos,
+    'ausentes':        loadAusentesAdmin,
     'prod-procesos':     () => loadProdPage('procesos'),
     'prod-responsables': () => loadProdPage('responsables'),
     'prod-lineas':       () => loadProdPage('lineas'),
@@ -3317,8 +3373,20 @@ function procesarArchivo(file) {
         }).join('') + '</tr>';
       }).join('');
       document.getElementById('importPreviewTable').innerHTML = '<thead><tr>' + thHtml + '</tr></thead><tbody>' + trHtml + '</tbody>';
+      // Detectar duplicados dentro del propio archivo (solo empleados)
+      var _dupInfo = '';
+      if (tabla === 'empleados') {
+        var _seenCods = new Set(), _dupCount = 0;
+        _importData.forEach(function(r){
+          var c = String(r.codigo||'').trim().toLowerCase();
+          if(c){ if(_seenCods.has(c)) _dupCount++; else _seenCods.add(c); }
+        });
+        if(_dupCount > 0)
+          _dupInfo = ' &nbsp;<span style="color:#c0392b;font-weight:700">⚠️ '+_dupCount+' filas duplicadas en el archivo (se omitirán)</span>';
+      }
       document.getElementById('importInfo').innerHTML =
-        '<strong>Archivo:</strong> ' + esc(file.name) + ' &nbsp;·&nbsp; <strong>Filas:</strong> ' + _importData.length + ' &nbsp;·&nbsp; <strong>Columnas:</strong> ' + cols.join(', ');
+        '<strong>Archivo:</strong> ' + esc(file.name) + ' &nbsp;·&nbsp; <strong>Filas:</strong> ' + _importData.length +
+        ' &nbsp;·&nbsp; <strong>Columnas:</strong> ' + cols.join(', ') + _dupInfo;
       document.getElementById('importPreview').style.display = 'block';
     } catch(err) {
       toast('Error al leer el archivo: ' + err.message, 'error', 5000);
@@ -3339,55 +3407,88 @@ async function ejecutarImport() {
   if (!db) { toast('Sin conexión a Supabase — ve a Configuración', 'error', 5000); return; }
   if (!_importData || !_importData.length) { toast('No hay datos para importar', 'warn'); return; }
 
-  var tabla = document.getElementById('importTabla').value;
-  var btn   = document.getElementById('btnImportar');
-  var prog  = document.getElementById('importProgress');
+  var tabla  = document.getElementById('importTabla').value;
+  var btn    = document.getElementById('btnImportar');
+  var prog   = document.getElementById('importProgress');
   btn.disabled = true;
-  btn.innerHTML = '<span class="spinner"></span>Importando…';
+  btn.innerHTML = '<span class="spinner"></span>Verificando duplicados…';
 
+  var COLS_VALIDAS = {
+    empleados:  ['codigo','nombre','centro_costo','contrato','activo','turno'],
+    produccion: ['especie','funcion','producto','proceso','operacion','responsable','linea','linea_especial','funcion_especial','activo'],
+  };
+  var colsValidas = COLS_VALIDAS[tabla] || null;
+
+  // ── Limpiar filas del archivo ──────────────────────────────
+  var turnoImport = (document.getElementById('importTurno')||{}).value || 'Día';
+  var dataLimpia = _importData.map(function(row) {
+    var r = {};
+    Object.keys(row).forEach(function(k) {
+      if (k === 'id' || k === 'created_at' || k === 'updated_at') return;
+      if (!k || k.startsWith('_') || k.startsWith('__')) return;
+      if (colsValidas && !colsValidas.includes(k)) return;
+      r[k] = (row[k] === null || row[k] === undefined) ? '' : row[k];
+    });
+    if (tabla === 'produccion' && !('activo' in r)) r.activo = true;
+    if (tabla === 'empleados') {
+      if (!('activo' in r)) r.activo = true;
+      r.turno = turnoImport;
+    }
+    return r;
+  }).filter(function(r) {
+    // Descartar filas sin campo clave
+    if (tabla === 'empleados') return !!(r.codigo && String(r.codigo).trim());
+    return true;
+  });
+
+  // ── Deduplicar dentro del propio archivo (mismos códigos repetidos) ──
+  var vistos = new Set();
+  var dupsArchivo = 0;
+  dataLimpia = dataLimpia.filter(function(r) {
+    if (tabla !== 'empleados') return true;
+    var cod = String(r.codigo||'').trim().toLowerCase();
+    if (vistos.has(cod)) { dupsArchivo++; return false; }
+    vistos.add(cod);
+    return true;
+  });
+
+  // ── Verificar contra Supabase: qué códigos ya existen ──────
+  var yaExisten = new Set();
+  if (tabla === 'empleados') {
+    var codigos = dataLimpia.map(function(r){ return String(r.codigo||'').trim(); }).filter(Boolean);
+    // Consultar en chunks de 200
+    for (var ci = 0; ci < codigos.length; ci += 200) {
+      var bloque = codigos.slice(ci, ci+200);
+      var { data: existData } = await db.from('empleados').select('codigo').in('codigo', bloque);
+      (existData||[]).forEach(function(e){ yaExisten.add(String(e.codigo||'').trim().toLowerCase()); });
+    }
+  }
+
+  var nuevos   = dataLimpia.filter(function(r){ return !yaExisten.has(String(r.codigo||'').trim().toLowerCase()); });
+  var skipped  = dataLimpia.length - nuevos.length;
+
+  prog.textContent = nuevos.length + ' nuevos | ' + skipped + ' ya existían | ' + dupsArchivo + ' duplicados en archivo';
+
+  if (!nuevos.length) {
+    btn.disabled = false;
+    btn.innerHTML = '📥 Importar a Supabase';
+    toast('⚠️ Todos los registros del archivo ya existen en Supabase (' + (skipped + dupsArchivo) + ' omitidos)', 'warn', 6000);
+    return;
+  }
+
+  btn.innerHTML = '<span class="spinner"></span>Importando ' + nuevos.length + '…';
+
+  // ── Insertar solo los nuevos en chunks ─────────────────────
   var okCount = 0, errCount = 0, errMsg = '';
   var CHUNK = 50;
-
-  for (var i = 0; i < _importData.length; i += CHUNK) {
-    var chunk = _importData.slice(i, i + CHUNK);
-
-    // Columnas válidas por tabla — ignorar columnas desconocidas o vacías del Excel
-    var COLS_VALIDAS = {
-      empleados:  ['codigo','nombre','centro_costo','contrato','activo','turno'],
-      produccion: ['especie','funcion','producto','proceso','operacion','responsable','linea','linea_especial','funcion_especial','activo'],
-    };
-    var colsValidas = COLS_VALIDAS[tabla] || null;
-
-    var chunkLimpio = chunk.map(function(row) {
-      var r = {};
-      Object.keys(row).forEach(function(k) {
-        // Ignorar campos del sistema
-        if (k === 'id' || k === 'created_at' || k === 'updated_at') return;
-        // Ignorar columnas vacías o con nombre inválido (ej: _empty, __EMPTY)
-        if (!k || k.startsWith('_') || k.startsWith('__')) return;
-        // Si hay lista de columnas válidas, solo enviar esas
-        if (colsValidas && !colsValidas.includes(k)) return;
-        r[k] = (row[k] === null || row[k] === undefined) ? '' : row[k];
-      });
-      // Valor por defecto para activo en produccion
-      if (tabla === 'produccion' && !('activo' in r)) r.activo = true;
-      if (tabla === 'empleados') {
-        if (!('activo' in r)) r.activo = true;
-        // Asignar turno seleccionado en el importador
-        var turnoImport = (document.getElementById('importTurno')||{}).value || 'Día';
-        r.turno = turnoImport;
-      }
-      return r;
-    });
-
-    // Usar upsert para ignorar duplicados
-    var onConflictCol = tabla === 'empleados' ? 'codigo' : null;
+  for (var i = 0; i < nuevos.length; i += CHUNK) {
+    var chunk = nuevos.slice(i, i + CHUNK);
     var result;
-    if (onConflictCol) {
-      result = await db.from(tabla).upsert(chunkLimpio, { onConflict: onConflictCol, ignoreDuplicates: true });
+    if (tabla === 'empleados') {
+      // insert puro — ya filtramos duplicados manualmente
+      result = await db.from(tabla).insert(chunk);
     } else {
-      // produccion: insertar ignorando errores de duplicados
-      result = await db.from(tabla).insert(chunkLimpio);
+      result = await db.from(tabla).insert(chunk);
     }
     if (result.error) {
       errCount += chunk.length;
@@ -3396,21 +3497,27 @@ async function ejecutarImport() {
     } else {
       okCount += chunk.length;
     }
-    var progNum = Math.min(i + CHUNK, _importData.length);
-    prog.textContent = progNum + '/' + _importData.length + ' — ' + okCount + ' ok' + (errCount ? ', ' + errCount + ' error' : '');
-    btn.innerHTML = '<span class="spinner"></span>' + progNum + '/' + _importData.length;
+    var progNum = Math.min(i + CHUNK, nuevos.length);
+    prog.textContent = progNum + '/' + nuevos.length + ' nuevos — ' +
+      skipped + ' ya existían — ' + dupsArchivo + ' dups archivo' +
+      (errCount ? ' — ' + errCount + ' errores' : '');
+    btn.innerHTML = '<span class="spinner"></span>' + progNum + '/' + nuevos.length;
   }
 
   btn.disabled = false;
   btn.innerHTML = '📥 Importar a Supabase';
 
+  var resumen = okCount + ' nuevos importados';
+  if (skipped)    resumen += ' · ' + skipped + ' ya existían (omitidos)';
+  if (dupsArchivo) resumen += ' · ' + dupsArchivo + ' duplicados en el archivo';
+
   if (errCount === 0) {
-    toast('✅ ' + okCount + ' registros importados correctamente', 'success', 5000);
+    toast('✅ ' + resumen, 'success', 7000);
     cancelarImport();
     if (tabla === 'empleados')  loadEmpleados();
     if (tabla === 'produccion') { loadProdPage('procesos'); loadProdPage('responsables'); loadProdPage('lineas'); loadProdPage('especiales'); }
   } else if (okCount > 0) {
-    toast('⚠️ ' + okCount + ' importados, ' + errCount + ' con error: ' + errMsg, 'warn', 8000);
+    toast('⚠️ ' + resumen + ' · ' + errCount + ' errores: ' + errMsg, 'warn', 8000);
   } else {
     toast('❌ Error al importar: ' + errMsg, 'error', 8000);
   }
@@ -4848,6 +4955,140 @@ window.onload = async () => {
   }
   // Si no hay sesión → mostrar login (ya visible por defecto)
 };
+
+// ════════════════════════════════════════════════════
+//  AUSENTES DEL DÍA — 3 TURNOS
+// ════════════════════════════════════════════════════
+async function loadAusentesAdmin() {
+  var db = getClient(); if (!db) return;
+
+  // Fecha seleccionada o hoy
+  var fechaEl = document.getElementById('ausentesAdmin-fecha');
+  if (!fechaEl.value) {
+    var hoy = new Date();
+    fechaEl.value = hoy.getFullYear()+'-'+String(hoy.getMonth()+1).padStart(2,'0')+'-'+String(hoy.getDate()).padStart(2,'0');
+  }
+  var fecha = fechaEl.value;
+  document.getElementById('ausentesAdmin-fecha-label').textContent = fecha.split('-').reverse().join('-');
+
+  // Loading en las 3 columnas
+  ['dia','tarde','noche'].forEach(function(t){
+    document.getElementById('lista-ausentes-'+t).innerHTML =
+      '<div style="padding:16px;text-align:center"><span class="spinner"></span></div>';
+    document.getElementById('cnt-ausentes-'+t).textContent = '…';
+  });
+
+  // 1. Empleados activos por turno
+  var empPorTurno = { Día:[], Tarde:[], Noche:[] };
+  var empPage = 0, empMore = true;
+  while(empMore) {
+    var { data: empData } = await db.from('empleados')
+      .select('id,codigo,nombre,turno,centro_costo')
+      .eq('activo', true).order('nombre')
+      .range(empPage*1000, empPage*1000+999);
+    if (!empData || !empData.length) { empMore = false; break; }
+    empData.forEach(function(e){
+      var t = e.turno || 'Día';
+      if (empPorTurno[t]) empPorTurno[t].push(e);
+    });
+    if (empData.length < 1000) empMore = false; else empPage++;
+  }
+
+  // 2. Lista No Registrar
+  var { data: noReg } = await db.from('noregistrar').select('codigo,nombre');
+  var nrCods = new Set((noReg||[]).map(function(r){ return (r.codigo||'').trim().toLowerCase(); }));
+  var nrNoms = new Set((noReg||[]).map(function(r){ return (r.nombre||'').trim().toLowerCase(); }));
+
+  // 3. Registros del día (todos los turnos)
+  var regsAll = [], rPage = 0, rMore = true;
+  while(rMore) {
+    var { data: rData } = await db.from('registros')
+      .select('codigo').eq('fecha', fecha)
+      .range(rPage*1000, rPage*1000+999);
+    if (!rData || !rData.length) { rMore = false; break; }
+    regsAll = regsAll.concat(rData);
+    if (rData.length < 1000) rMore = false; else rPage++;
+  }
+  var conReg = new Set(regsAll.map(function(r){ return (r.codigo||'').trim().toLowerCase(); }));
+
+  // 4. Vacaciones activas en la fecha
+  var { data: vacData } = await db.from('vacaciones')
+    .select('codigo,estado').or('estado.eq.EN CURSO,estado.eq.POR TOMAR');
+  var enVac = new Set((vacData||[]).filter(function(v){
+    return v.estado === 'EN CURSO';
+  }).map(function(v){ return (v.codigo||'').trim().toLowerCase(); }));
+
+  // 5. Permisos del día
+  var { data: permData } = await db.from('permisos').select('codigo,tipo').eq('fecha', fecha);
+  var permMap = {};
+  (permData||[]).forEach(function(p){
+    permMap[(p.codigo||'').trim().toLowerCase()] = p.tipo || 'Permiso';
+  });
+
+  // 6. Licencias
+  var { data: licData } = await db.from('empleados')
+    .select('codigo,licencia_inicio,licencia_fin')
+    .eq('activo',true).not('licencia_inicio','is',null);
+  var enLic = new Set((licData||[]).filter(function(e){
+    return e.licencia_inicio && fecha >= e.licencia_inicio &&
+      (!e.licencia_fin || fecha <= e.licencia_fin);
+  }).map(function(e){ return (e.codigo||'').trim().toLowerCase(); }));
+
+  // 7. Para cada turno: filtrar ausentes
+  var turnosMap = { Día:'dia', Tarde:'tarde', Noche:'noche' };
+  Object.keys(turnosMap).forEach(function(turno) {
+    var colId = turnosMap[turno];
+    var emps = empPorTurno[turno] || [];
+
+    // Excluir No Registrar
+    var ausentes = emps.filter(function(e){
+      var cod = (e.codigo||'').trim().toLowerCase();
+      var nom = (e.nombre||'').trim().toLowerCase();
+      if (nrCods.has(cod) || nrNoms.has(nom)) return false;
+      // Tiene registro → no es ausente
+      if (conReg.has(cod)) return false;
+      return true;
+    });
+
+    // Clasificar estado
+    var filas = ausentes.map(function(e) {
+      var cod = (e.codigo||'').trim().toLowerCase();
+      var estado = 'Sin Registro';
+      var estadoCls = 'sin-reg-badge';
+      if (enLic.has(cod)) { estado = 'Licencia Médica'; estadoCls = 'lic-badge'; }
+      else if (enVac.has(cod)) { estado = 'Vacaciones'; estadoCls = 'vac-badge'; }
+      else if (permMap[cod]) { estado = permMap[cod]; estadoCls = 'perm-badge'; }
+      return { emp: e, estado, estadoCls };
+    });
+
+    var listEl = document.getElementById('lista-ausentes-'+colId);
+    var cntEl  = document.getElementById('cnt-ausentes-'+colId);
+
+    cntEl.textContent = filas.length;
+
+    if (!filas.length) {
+      listEl.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted);font-size:12px">✅ Sin ausentes</div>';
+      return;
+    }
+
+    var BADGE_CSS = {
+      'sin-reg-badge': 'background:rgba(224,82,82,.12);color:#c0392b;border:1px solid rgba(224,82,82,.3)',
+      'vac-badge':     'background:rgba(0,152,212,.12);color:#0077aa;border:1px solid rgba(0,152,212,.3)',
+      'lic-badge':     'background:rgba(255,193,7,.15);color:#7a5c00;border:1px solid rgba(255,193,7,.4)',
+      'perm-badge':    'background:rgba(39,174,96,.12);color:#1a7a40;border:1px solid rgba(39,174,96,.3)',
+    };
+
+    listEl.innerHTML = filas.map(function(f){
+      var bdgStyle = BADGE_CSS[f.estadoCls] || BADGE_CSS['sin-reg-badge'];
+      return '<div style="display:flex;align-items:center;gap:8px;padding:6px 12px;border-bottom:1px solid var(--border)">' +
+        '<span style="font-family:var(--mono);font-size:11px;font-weight:700;color:var(--accent2);min-width:52px">' + esc(f.emp.codigo) + '</span>' +
+        '<span style="flex:1;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="' + esc(f.emp.nombre) + '">' + esc(f.emp.nombre) + '</span>' +
+        '<span style="font-size:10px;font-weight:600;padding:1px 7px;border-radius:10px;white-space:nowrap;' + bdgStyle + '">' + esc(f.estado) + '</span>' +
+        '</div>';
+    }).join('');
+  });
+}
+
 </script>
 
 <!-- ══ LOGIN SCREEN ══ -->
