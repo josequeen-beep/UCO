@@ -3128,7 +3128,13 @@ function onLineaChange(linea){
 //  Líneas especiales: Col H → Línea, Col I → Función
 // ══════════════════════════════════════════
 function cargarListas(){
-  getListData().then(aplicarListas).catch(e=>showToast('❌ Error al cargar listas: '+(e.message||e),'error'));
+  getListData().then(function(d){
+    aplicarListas(d);
+    // Poblar select de línea desde Supabase una vez que las listas cargaron
+    _poblarSelectLinea((d.lineas||[]));
+  }).catch(e=>showToast('❌ Error al cargar listas: '+(e.message||e),'error'));
+  // También cargar líneas desde tabla produccion para el select (por si aún no hay registros)
+  _cargarLineasSupabase();
 }
 
 function aplicarListas(d){
@@ -4070,11 +4076,8 @@ function initFiltros(){
   const hoy = localDate(new Date());
   document.getElementById('filtroDesde').value = hoy;
   document.getElementById('filtroHasta').value = hoy;
-  // Poblar select de Líneas con datos reales
-  const lineas = [...new Set(todosRegistros.map(r=>String(r[4]||'').trim()).filter(Boolean))].sort();
-  const sel = document.getElementById('filtroLinea');
-  sel.innerHTML = '<option value="">Todas</option>';
-  lineas.forEach(l=>{ const o=document.createElement('option'); o.value=l; o.textContent=l; sel.appendChild(o); });
+  // Poblar select de Líneas desde todosRegistros (fallback mientras carga desde Supabase)
+  _poblarSelectLinea(todosRegistros.map(r=>String(r[4]||'').trim()));
 }
 
 async function cargarRegistros(){
@@ -4273,17 +4276,65 @@ function getMes(fecha){
   return m[new Date(fecha+'T12:00').getMonth()];
 }
 
+// ── Función centralizada para poblar el select de Línea ─────
+// Ordena con el mismo comparador alfanumérico que el Excel:
+// 1 < 1B < 2 < 3 < EMPAQUE < MPRIMA < S/L < SERVICIOS < SUBPRODUCTO
+function _parseLineaOrd(v){
+  var s=String(v||'').trim().toUpperCase();
+  if(!s) return [2,0,''];
+  var m=s.match(/^(\d+)([A-Z]*)$/);
+  if(m) return [0,parseInt(m[1],10),m[2]];
+  return [1,0,s];
+}
+function _cmpLinea(a,b){
+  var pa=_parseLineaOrd(a),pb=_parseLineaOrd(b);
+  if(pa[0]!==pb[0]) return pa[0]-pb[0];
+  if(pa[1]!==pb[1]) return pa[1]-pb[1];
+  if(pa[2]!==pb[2]){
+    if(!pa[2]) return -1; if(!pb[2]) return 1;
+    return pa[2].localeCompare(pb[2],'es');
+  }
+  return 0;
+}
+
+function _poblarSelectLinea(valoresRaw){
+  var sel = document.getElementById('filtroLinea');
+  if(!sel) return;
+  var prev = sel.value;
+  var unicas = [...new Set(valoresRaw.map(function(v){ return String(v||'').trim(); }).filter(Boolean))];
+  unicas.sort(_cmpLinea);
+  sel.innerHTML = '<option value="">Todas</option>';
+  unicas.forEach(function(l){
+    var o=document.createElement('option');
+    o.value=l; o.textContent=l; sel.appendChild(o);
+  });
+  if(prev && unicas.includes(prev)) sel.value = prev;
+}
+
+// Carga líneas únicas desde Supabase (al primer arranque, antes de que haya registros)
+async function _cargarLineasSupabase(){
+  try {
+    var db = _sbDb(); if(!db) return;
+    var {data, error} = await db.from('produccion')
+      .select('linea').eq('activo',true).eq('seccion','lineas');
+    if(error || !data || !data.length) return;
+    var lineasProd = data.map(function(r){ return String(r.linea||'').trim(); }).filter(Boolean);
+    // También incluir líneas especiales como opciones
+    if(window._lineaEspecialDinamica && window._lineaEspecialDinamica.size > 0){
+      window._lineaEspecialDinamica.forEach(function(l){ lineasProd.push(l); });
+    }
+    _poblarSelectLinea(lineasProd);
+  } catch(e){ /* silencioso */ }
+}
+
 function inicializarFiltros(){
   const hoy=localDate(new Date());
   document.getElementById('filtroDesde').value=hoy;
   document.getElementById('filtroHasta').value=hoy;
-  // Poblar líneas
-  const lineas=[...new Set(todosRegistros.map(r=>String(r[4]||'').trim()).filter(Boolean))].sort();
-  const sel=document.getElementById('filtroLinea');
-  const prev=sel.value;
-  sel.innerHTML='<option value="">Todas</option>';
-  lineas.forEach(l=>{const o=document.createElement('option');o.value=l;o.textContent=l;sel.appendChild(o);});
-  if(prev) sel.value=prev;
+  // Poblar líneas desde todosRegistros (mantener selección previa)
+  const _prevLinea = document.getElementById('filtroLinea').value;
+  _poblarSelectLinea(todosRegistros.map(r=>String(r[4]||'').trim()));
+  if(_prevLinea) document.getElementById('filtroLinea').value = _prevLinea;
   // Aplicar turno automático según hora actual si no hay turno seleccionado
   const selTurno=document.getElementById('filtroTurno');
   if(selTurno && !selTurno.value){
@@ -4547,21 +4598,19 @@ function sortTable(col){
   const ordenEstadoReg = {'⚠️ Duplicado':0, 'OK':1};
 
   todosRegistros = todosRegistros.slice().sort((a,b)=>{
-    let av, bv;
+    let av, bv, r;
     if(col === 'estado'){
-      // Estado se determina en renderTabla, no existe en el array raw
-      // Ordenamos por código+fecha para agrupar duplicados
-      const fechaA = String(a[1]||'').substring(0,10);
-      const codA   = String(a[5]||'').toLowerCase();
-      const fechaB = String(b[1]||'').substring(0,10);
-      const codB   = String(b[5]||'').toLowerCase();
-      av = fechaA + '|' + codA;
-      bv = fechaB + '|' + codB;
+      const fechaA=String(a[1]||'').substring(0,10), codA=String(a[5]||'').toLowerCase();
+      const fechaB=String(b[1]||'').substring(0,10), codB=String(b[5]||'').toLowerCase();
+      av=fechaA+'|'+codA; bv=fechaB+'|'+codB;
+      r = av.localeCompare(bv,'es');
+    } else if(col === 4){
+      // Columna Línea — orden alfanumérico: 1 < 1B < 2 < 3 < EMPAQUE < MPRIMA...
+      r = _cmpLinea(String(a[4]||''), String(b[4]||''));
     } else {
-      av = String(a[col]||'').toLowerCase();
-      bv = String(b[col]||'').toLowerCase();
+      av=String(a[col]||'').toLowerCase(); bv=String(b[col]||'').toLowerCase();
+      r = av.localeCompare(bv,'es');
     }
-    const r = av.localeCompare(bv,'es');
     return sortAsc ? r : -r;
   });
   aplicarFiltros();
