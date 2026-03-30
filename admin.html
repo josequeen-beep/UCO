@@ -1918,23 +1918,40 @@ body {
 
 <!-- ══ MODAL PROCESOS ══ -->
 <div class="modal-overlay" id="modalProcesos">
-  <div class="modal">
+  <div class="modal" style="max-width:640px">
     <div class="modal-header">
       <h2 id="modalProcesosTitle">🐟 Nuevo Proceso</h2>
       <button class="modal-close" onclick="cerrarModal('modalProcesos')">✕</button>
     </div>
     <div class="modal-body">
+
+      <!-- Selector de proceso existente -->
+      <div id="mp-selector-wrap" style="margin-bottom:14px">
+        <label class="form-label" style="margin-bottom:6px;display:block">Seleccionar proceso existente como base</label>
+        <div style="display:flex;gap:8px">
+          <select id="mp-selector" class="form-select" style="flex:1" onchange="mpOnSelectExistente()">
+            <option value="">— Cargar desde existente —</option>
+          </select>
+          <button class="btn btn-secondary btn-sm" onclick="mpLimpiarCampos()" title="Limpiar campos">✕ Nuevo</button>
+        </div>
+        <div id="mp-dup-warn" style="display:none;margin-top:8px;padding:7px 12px;background:rgba(224,82,82,.1);border:1px solid rgba(224,82,82,.3);border-radius:6px;font-size:12px;color:#c0392b;font-weight:600">
+          ⚠️ Esta combinación ya existe
+        </div>
+      </div>
+
+      <div style="border-top:1px solid var(--border);margin-bottom:14px"></div>
+
       <div class="form-grid">
-        <div class="form-field"><label class="form-label">Especie *</label><input class="form-input" id="mp-especie" placeholder="Ej: MERLUZA AUSTRAL"></div>
-        <div class="form-field"><label class="form-label">Función</label><input class="form-input" id="mp-funcion" placeholder="Ej: ABASTECIMIENTO"></div>
-        <div class="form-field"><label class="form-label">Producto</label><input class="form-input" id="mp-producto" placeholder="Ej: PORCION ESPAÑA"></div>
-        <div class="form-field"><label class="form-label">Proceso</label><input class="form-input" id="mp-proceso" placeholder="Ej: CONGELADO"></div>
-        <div class="form-field full"><label class="form-label">Operación</label><input class="form-input" id="mp-operacion" placeholder="Ej: PORCIONADO MANUAL"></div>
+        <div class="form-field"><label class="form-label">Especie *</label><input class="form-input" id="mp-especie" placeholder="Ej: MERLUZA AUSTRAL" oninput="mpVerificarDup()"></div>
+        <div class="form-field"><label class="form-label">Función</label><input class="form-input" id="mp-funcion" placeholder="Ej: ABASTECIMIENTO" oninput="mpVerificarDup()"></div>
+        <div class="form-field"><label class="form-label">Producto</label><input class="form-input" id="mp-producto" placeholder="Ej: PORCION ESPAÑA" oninput="mpVerificarDup()"></div>
+        <div class="form-field"><label class="form-label">Proceso</label><input class="form-input" id="mp-proceso" placeholder="Ej: CONGELADO" oninput="mpVerificarDup()"></div>
+        <div class="form-field full"><label class="form-label">Operación</label><input class="form-input" id="mp-operacion" placeholder="Ej: PORCIONADO MANUAL" oninput="mpVerificarDup()"></div>
       </div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="cerrarModal('modalProcesos')">Cancelar</button>
-      <button class="btn btn-primary" onclick="guardarSeccion('procesos')">💾 Guardar</button>
+      <button class="btn btn-primary" id="mp-btn-guardar" onclick="guardarSeccion('procesos')">💾 Guardar</button>
     </div>
   </div>
 </div>
@@ -3015,6 +3032,20 @@ function abrirSeccion(seccion, r = null) {
     if (el) el.value = r ? (r[dbKey] || '') : '';
   });
   document.getElementById(cfg.modal).classList.add('open');
+
+  // Procesos: cargar selector y ajustar visibilidad
+  if (seccion === 'procesos') {
+    var selectorWrap = document.getElementById('mp-selector-wrap');
+    var dupWarn = document.getElementById('mp-dup-warn');
+    var btn = document.getElementById('mp-btn-guardar');
+    if (selectorWrap) selectorWrap.style.display = r ? 'none' : ''; // ocultar en edición
+    if (dupWarn) dupWarn.style.display = 'none';
+    if (btn) btn.disabled = false;
+    // Reset selector
+    var sel = document.getElementById('mp-selector');
+    if (sel) sel.value = '';
+    if (!r) mpCargarSelector(); // solo en nuevo, no en editar
+  }
 }
 
 async function editarSeccion(seccion, id) {
@@ -3053,6 +3084,18 @@ async function guardarSeccion(seccion) {
       if (exist?.length) {
         toast(`Ya existe "${vals.linea_especial} / ${vals.funcion_especial}" en esta sección`, 'error'); return;
       }
+    } else if (seccion === 'procesos') {
+      // Procesos: duplicado = misma combinación de los 5 campos
+      existQ = existQ
+        .eq('especie',   vals.especie   || '')
+        .eq('funcion',   vals.funcion   || '')
+        .eq('producto',  vals.producto  || '')
+        .eq('proceso',   vals.proceso   || '')
+        .eq('operacion', vals.operacion || '');
+      const { data: exist } = await existQ.limit(1);
+      if (exist?.length) {
+        toast('Este proceso ya existe con la misma combinación de campos', 'error'); return;
+      }
     } else {
       const campoUnico = Object.keys(cfg.campos)[0];
       const valUnico   = vals[campoUnico];
@@ -3068,6 +3111,7 @@ async function guardarSeccion(seccion) {
   if (error) { toast('Error: '+error.message, 'error'); return; }
   toast(_editingId ? '✅ Actualizado' : '✅ Entrada agregada');
   cerrarModal(cfg.modal);
+  if (seccion === 'procesos') mpInvalidarCache();
   loadProdPage(seccion);
   loadCounts();
 }
@@ -5136,6 +5180,116 @@ async function loadAusentesAdmin() {
         '</div>';
     }).join('');
   });
+}
+
+
+// ════════════════════════════════════════════════════
+//  MODAL PROCESOS — selector con existentes
+// ════════════════════════════════════════════════════
+var _mpProcesosCache = []; // cache de todos los procesos cargados
+
+// Cargar procesos en el selector al abrir el modal
+async function mpCargarSelector() {
+  var db = getClient(); if (!db) return;
+  var sel = document.getElementById('mp-selector');
+  if (!sel) return;
+
+  // Si hay cache fresco, usar eso
+  if (!_mpProcesosCache.length) {
+    sel.innerHTML = '<option value="">⏳ Cargando...</option>';
+    var { data, error } = await db.from('produccion')
+      .select('id,especie,funcion,producto,proceso,operacion')
+      .eq('activo', true).eq('seccion', 'procesos')
+      .order('especie').order('funcion').order('producto');
+    if (error) { sel.innerHTML = '<option value="">— Error al cargar —</option>'; return; }
+    _mpProcesosCache = data || [];
+  }
+
+  sel.innerHTML = '<option value="">— Seleccionar proceso existente —</option>';
+  _mpProcesosCache.forEach(function(r, i) {
+    var parts = [r.especie, r.funcion, r.producto, r.proceso, r.operacion].filter(Boolean);
+    var lbl = parts.join(' · ');
+    var opt = document.createElement('option');
+    opt.value = i;
+    opt.textContent = lbl;
+    sel.appendChild(opt);
+  });
+  sel.appendChild(Object.assign(document.createElement('option'), {
+    value: '__nuevo__',
+    textContent: '➕ Agregar nuevo proceso'
+  }));
+}
+
+// Al seleccionar una opción del selector
+function mpOnSelectExistente() {
+  var sel = document.getElementById('mp-selector');
+  var val = sel.value;
+
+  if (val === '__nuevo__') {
+    mpLimpiarCampos();
+    sel.value = '__nuevo__';
+    return;
+  }
+
+  if (val === '') {
+    mpLimpiarCampos();
+    return;
+  }
+
+  var idx = parseInt(val);
+  var r = _mpProcesosCache[idx];
+  if (!r) return;
+
+  document.getElementById('mp-especie').value   = r.especie   || '';
+  document.getElementById('mp-funcion').value   = r.funcion   || '';
+  document.getElementById('mp-producto').value  = r.producto  || '';
+  document.getElementById('mp-proceso').value   = r.proceso   || '';
+  document.getElementById('mp-operacion').value = r.operacion || '';
+
+  mpVerificarDup();
+}
+
+// Limpiar todos los campos
+function mpLimpiarCampos() {
+  ['mp-especie','mp-funcion','mp-producto','mp-proceso','mp-operacion'].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  document.getElementById('mp-dup-warn').style.display = 'none';
+  document.getElementById('mp-btn-guardar').disabled = false;
+}
+
+// Verificar si la combinación actual ya existe (en tiempo real)
+function mpVerificarDup() {
+  var especie   = (document.getElementById('mp-especie').value   || '').trim().toUpperCase();
+  var funcion   = (document.getElementById('mp-funcion').value   || '').trim().toUpperCase();
+  var producto  = (document.getElementById('mp-producto').value  || '').trim().toUpperCase();
+  var proceso   = (document.getElementById('mp-proceso').value   || '').trim().toUpperCase();
+  var operacion = (document.getElementById('mp-operacion').value || '').trim().toUpperCase();
+
+  // Solo verificar si hay al menos especie
+  var warn = document.getElementById('mp-dup-warn');
+  var btn  = document.getElementById('mp-btn-guardar');
+  if (!especie) { warn.style.display='none'; btn.disabled=false; return; }
+
+  // Si estamos editando, no marcar como duplicado el mismo registro
+  if (_editingId) { warn.style.display='none'; btn.disabled=false; return; }
+
+  var esDup = _mpProcesosCache.some(function(r) {
+    return (r.especie   ||'').toUpperCase() === especie   &&
+           (r.funcion   ||'').toUpperCase() === funcion   &&
+           (r.producto  ||'').toUpperCase() === producto  &&
+           (r.proceso   ||'').toUpperCase() === proceso   &&
+           (r.operacion ||'').toUpperCase() === operacion;
+  });
+
+  warn.style.display = esDup ? '' : 'none';
+  btn.disabled = esDup;
+}
+
+// Invalidar cache al guardar un proceso nuevo
+function mpInvalidarCache() {
+  _mpProcesosCache = [];
 }
 
 </script>
