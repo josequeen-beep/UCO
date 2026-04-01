@@ -5029,9 +5029,17 @@ function renderTablaCombinada(regs, dias, filtro){
 
   // ── Fila subtotales por día ──────────────────────────────
   const colsTotal=dias.map(d=>`<td class="td-num" style="font-size:15px;color:#ffffff">${totalDia[d.fecha]||'—'}</td>`).join('');
+
+  // Promedio diario: total ÷ días que tienen al menos 1 registro
+  const diasConDatos = dias.filter(d => (totalDia[d.fecha]||0) > 0).length;
+  const promedioDiario = diasConDatos > 0 ? Math.round(granTotal / diasConDatos) : 0;
+  const promedioLabel = diasConDatos > 0
+    ? `≈ ${promedioDiario} <span style="font-size:11px;font-weight:500;opacity:.75">/ día (${diasConDatos} día${diasConDatos!==1?'s':''})</span>`
+    : '—';
+
   filas+=`<tr class="tr-gran-total">
     <td colspan="2" style="font-size:13px;letter-spacing:.3px">
-      🏁 Total &nbsp;<span style="font-size:17px;font-family:'Calibri',sans-serif">${granTotal}</span>
+      📊 Promedio diario &nbsp;<span style="font-size:17px;font-family:'Calibri',sans-serif">${promedioLabel}</span>
     </td>
     ${colsTotal}
   </tr>`;
