@@ -1391,6 +1391,10 @@ body {
         <div><h1>Log de Auditoría</h1><p>Historial de todas las operaciones realizadas</p></div>
         <div class="page-header-actions">
           <button class="btn btn-secondary" onclick="loadAuditLog()">🔄 Recargar</button>
+          <button class="btn" style="background:rgba(224,82,82,.12);color:#c0392b;border:1px solid rgba(224,82,82,.3);font-size:12px;font-weight:600;padding:6px 14px;border-radius:7px;cursor:pointer"
+            onclick="confirmarEliminarAuditLog()" title="Elimina los 500 registros más antiguos del log">
+            🗑 Eliminar 500 más antiguos
+          </button>
         </div>
       </div>
       <!-- Filtros -->
@@ -1428,6 +1432,7 @@ body {
             <thead>
               <tr>
                 <th style="white-space:nowrap">Fecha y Hora</th>
+                <th>Responsable</th>
                 <th>Usuario</th>
                 <th>Email</th>
                 <th>Acción</th>
@@ -3238,7 +3243,7 @@ function limpiarFiltrosAudit() {
 async function loadAuditLog() {
   const db = getClient(); if (!db) return;
   const tbody = document.getElementById('tbodyAudit');
-  tbody.innerHTML = '<tr class="loading-row"><td colspan="5"><span class="spinner"></span>Cargando…</td></tr>';
+  tbody.innerHTML = '<tr class="loading-row"><td colspan="6"><span class="spinner"></span>Cargando…</td></tr>';
 
   const accion = (document.getElementById('audit-fil-accion')?.value || '').trim();
   const desde  = (document.getElementById('audit-fil-desde')?.value  || '').trim();
@@ -3252,7 +3257,7 @@ async function loadAuditLog() {
   if (accion) q = q.eq('accion', accion);
   if (desde)  q = q.gte('timestamp', desde + 'T00:00:00');
   if (hasta)  q = q.lte('timestamp', hasta + 'T23:59:59');
-  if (busq)   q = q.ilike('detalle', '%' + busq + '%');
+  if (busq)   q = q.or('detalle.ilike.%' + busq + '%,usuario.ilike.%' + busq + '%');
 
   // Paginación
   const ini = (_auditPage - 1) * _AUDIT_PER_PAGE;
@@ -3266,7 +3271,7 @@ async function loadAuditLog() {
   if (countEl) countEl.textContent = (count||0).toLocaleString('es-CL') + ' registros';
 
   if (!data?.length) {
-    tbody.innerHTML = '<tr><td colspan="5"><div class="empty-state"><div class="ei">🔍</div><p>Sin registros</p></div></td></tr>';
+    tbody.innerHTML = '<tr><td colspan="6"><div class="empty-state"><div class="ei">🔍</div><p>Sin registros</p></div></td></tr>';
     document.getElementById('audit-pagination').innerHTML = '';
     return;
   }
@@ -3282,11 +3287,12 @@ async function loadAuditLog() {
 
   tbody.innerHTML = data.map(r => {
     const email = r.email || usuarioMap[r.usuario] || '';
-    // Parsear detalle para mostrar código/nombre resaltados
     const det = esc(r.detalle||'');
+    // Extraer responsable del sesion (abreviatura) si existe, sino mostrar usuario
+    const responsable = r.usuario || '—';
     return `<tr>
       <td style="font-family:var(--mono);font-size:11px;white-space:nowrap">${fmtTs(r.timestamp)}</td>
-      <td style="font-size:12px;font-weight:600">${esc(r.usuario||'—')}</td>
+      <td style="font-size:12px;font-weight:600;white-space:nowrap">${esc(responsable)}</td>
       <td style="font-size:11px;color:var(--muted)">${esc(email)}</td>
       <td><span class="badge ${colAccion[r.accion]||''}">${esc(r.accion)}</span></td>
       <td style="font-size:12px;max-width:500px" title="${det}">${det}</td>
@@ -5367,6 +5373,52 @@ function mpActualizarSugerencias() {
     var vals = [...sets[c]].sort(function(a,b){ return a.localeCompare(b,'es'); });
     dl.innerHTML = vals.map(function(v){ return '<option value="'+v.replace(/"/g,'&quot;')+'">'; }).join('');
   });
+}
+
+
+// ════════════════════════════════════════════════════
+//  ELIMINAR 500 REGISTROS MÁS ANTIGUOS DEL AUDIT LOG
+// ════════════════════════════════════════════════════
+function confirmarEliminarAuditLog() {
+  document.getElementById('confirmMsg').textContent =
+    '¿Eliminar los 500 registros más antiguos del log de auditoría? Esta acción no se puede deshacer.';
+  window._pendingAction = 'eliminarAuditLog';
+  document.getElementById('modalConfirm').classList.add('open');
+  document.getElementById('modalConfirm').querySelector('.btn-danger').onclick = ejecutarEliminarAuditLog;
+}
+
+async function ejecutarEliminarAuditLog() {
+  const db = getClient(); if (!db) return;
+  cerrarModal('modalConfirm');
+  toast('⏳ Eliminando 500 registros antiguos…', 'info');
+
+  // Obtener los IDs de los 500 más antiguos
+  const { data: oldest, error: errFetch } = await db
+    .from('audit_log')
+    .select('id')
+    .order('timestamp', { ascending: true })
+    .limit(500);
+
+  if (errFetch) { toast('Error al obtener registros: ' + errFetch.message, 'error'); return; }
+  if (!oldest || !oldest.length) { toast('No hay registros para eliminar', 'warn'); return; }
+
+  const ids = oldest.map(r => r.id);
+
+  const { error: errDel } = await db
+    .from('audit_log')
+    .delete()
+    .in('id', ids);
+
+  if (errDel) {
+    toast('Error al eliminar: ' + errDel.message, 'error');
+    return;
+  }
+
+  toast('✅ ' + ids.length + ' registros antiguos eliminados del log', 'success', 5000);
+  loadAuditLog();
+  loadCounts();
+  // Restaurar acción original del botón confirmar
+  document.getElementById('modalConfirm').querySelector('.btn-danger').onclick = ejecutarEliminar;
 }
 
 </script>
