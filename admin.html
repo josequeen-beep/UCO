@@ -756,6 +756,14 @@ body {
         <span class="si-icon"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><polygon points="8,2 9.8,6.2 14.5,6.5 11,9.7 12.1,14.3 8,11.8 3.9,14.3 5,9.7 1.5,6.5 6.2,6.2"/></svg></span> Líneas Especiales
         <span class="si-count" id="cnt-prod-especiales">—</span>
       </button>
+      <button class="sidebar-item" onclick="goPage('subprocesos')">
+        <span class="si-icon"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1.5" y="3" width="5" height="4" rx="1"/><rect x="9.5" y="3" width="5" height="4" rx="1"/><rect x="1.5" y="9" width="5" height="4" rx="1"/><rect x="9.5" y="9" width="5" height="4" rx="1"/><line x1="6.5" y1="5" x2="9.5" y2="5"/><line x1="6.5" y1="11" x2="9.5" y2="11"/></svg></span> Subprocesos
+        <span class="si-count" id="cnt-subprocesos">—</span>
+      </button>
+      <button class="sidebar-item" onclick="goPage('mapeo')">
+        <span class="si-icon"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 4h12M2 8h12M2 12h12"/><circle cx="4" cy="4" r="1.2" fill="currentColor"/><circle cx="8" cy="8" r="1.2" fill="currentColor"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/></svg></span> Mapeo Procesos
+        <span class="si-count" id="cnt-mapeo">—</span>
+      </button>
       <button class="sidebar-item" onclick="goPage('noregistrar')">
         <span class="si-icon"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6"/><line x1="4.5" y1="4.5" x2="11.5" y2="11.5"/></svg></span> No registrar
         <span class="si-count" id="cnt-noregistrar">—</span>
@@ -1147,6 +1155,149 @@ body {
           </table>
         </div>
         <div class="pagination" id="paginationLineas"></div>
+      </div>
+    </div>
+
+    <!-- ══ MAPEO PROCESOS (Línea+Función+Especie+Producto) ══ -->
+    <div class="page" id="page-mapeo">
+      <div class="page-header">
+        <div>
+          <h1>🗺 Mapeo de Procesos</h1>
+          <p>Combinaciones: Línea · Función · Especie · Producto — usado para clasificar registros</p>
+        </div>
+        <div class="page-header-actions">
+          <button class="btn btn-secondary" onclick="loadMapeo()">🔄 Recargar</button>
+          <label class="btn btn-secondary" style="cursor:pointer;margin:0">
+            📥 Importar Excel
+            <input type="file" id="mapeoFile" accept=".xlsx,.xls" style="display:none" onchange="mapeoImportarExcel(event)">
+          </label>
+          <button class="btn btn-primary" onclick="abrirMapeoModal()">＋ Nueva combinación</button>
+        </div>
+      </div>
+
+      <div class="table-area">
+        <!-- Filtros en cascada -->
+        <div class="toolbar" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:14px 16px;background:rgba(0,152,212,.04);border-bottom:1px solid var(--border)">
+          <select class="form-select" id="mpFiltroLinea" onchange="mapeoFiltrar()" style="min-width:140px">
+            <option value="">Todas las líneas</option>
+          </select>
+          <select class="form-select" id="mpFiltroFuncion" onchange="mapeoFiltrar()" style="min-width:180px">
+            <option value="">Todas las funciones</option>
+          </select>
+          <select class="form-select" id="mpFiltroEspecie" onchange="mapeoFiltrar()" style="min-width:160px">
+            <option value="">Todas las especies</option>
+          </select>
+          <select class="form-select" id="mpFiltroProducto" onchange="mapeoFiltrar()" style="min-width:200px">
+            <option value="">Todos los productos</option>
+          </select>
+          <input class="search-input" id="mpSearch" placeholder="🔍 Buscar..." oninput="mapeoFiltrar()" style="flex:1;min-width:180px">
+          <button class="btn btn-sm" onclick="mapeoLimpiarFiltros()" style="background:transparent;border:1px solid var(--border);color:var(--muted)">✕ Limpiar</button>
+        </div>
+
+        <div id="mapeoResumen" style="padding:10px 16px;background:rgba(0,152,212,.06);border-bottom:1px solid var(--border);font-size:12px;color:var(--muted);display:flex;gap:16px;flex-wrap:wrap">
+          <span>⏳ Cargando...</span>
+        </div>
+
+        <div class="data-table-wrap" style="overflow-x:auto">
+          <table class="data-table">
+            <thead><tr>
+              <th style="width:90px">Acciones</th>
+              <th onclick="mapeoSort('linea')" style="cursor:pointer">Línea <span id="mp-sort-linea"></span></th>
+              <th onclick="mapeoSort('funcion')" style="cursor:pointer">Función <span id="mp-sort-funcion"></span></th>
+              <th onclick="mapeoSort('especie')" style="cursor:pointer">Especie <span id="mp-sort-especie"></span></th>
+              <th onclick="mapeoSort('producto')" style="cursor:pointer">Producto <span id="mp-sort-producto"></span></th>
+            </tr></thead>
+            <tbody id="tbodyMapeo">
+              <tr class="loading-row"><td colspan="5"><span class="spinner"></span>Cargando…</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div id="mapeoPagination" style="padding:12px 16px;display:flex;justify-content:space-between;align-items:center;border-top:1px solid var(--border);font-size:12px;color:var(--muted)">
+          <span id="mapeoPagInfo">—</span>
+          <div style="display:flex;gap:6px">
+            <button class="btn btn-sm" onclick="mapeoPagPrev()">‹</button>
+            <span id="mapeoPagNums" style="display:flex;gap:4px"></span>
+            <button class="btn btn-sm" onclick="mapeoPagNext()">›</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal nueva combinación -->
+    <div class="modal-overlay" id="modalMapeo">
+      <div class="modal" style="max-width:640px">
+        <div class="modal-header">
+          <h2 id="modalMapeoTitle">🗺 Nueva combinación</h2>
+          <button class="modal-close" onclick="cerrarModal('modalMapeo')">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-grid">
+            <div class="form-field">
+              <label class="form-label">Línea *</label>
+              <input class="form-input" id="mpf-linea" list="dl-mpf-linea" autocomplete="off" placeholder="Ej: 2" oninput="mapeoVerificarDup()">
+              <datalist id="dl-mpf-linea"></datalist>
+            </div>
+            <div class="form-field">
+              <label class="form-label">Función *</label>
+              <input class="form-input" id="mpf-funcion" list="dl-mpf-funcion" autocomplete="off" placeholder="Ej: FILETEO" oninput="mapeoVerificarDup()">
+              <datalist id="dl-mpf-funcion"></datalist>
+            </div>
+            <div class="form-field">
+              <label class="form-label">Especie</label>
+              <input class="form-input" id="mpf-especie" list="dl-mpf-especie" autocomplete="off" placeholder="Ej: REINETA" oninput="mapeoVerificarDup()">
+              <datalist id="dl-mpf-especie"></datalist>
+            </div>
+            <div class="form-field">
+              <label class="form-label">Producto</label>
+              <input class="form-input" id="mpf-producto" list="dl-mpf-producto" autocomplete="off" placeholder="Ej: FILETE IQF 5 kg" oninput="mapeoVerificarDup()">
+              <datalist id="dl-mpf-producto"></datalist>
+            </div>
+          </div>
+          <div id="mpf-dup-warn" style="display:none;margin-top:10px;padding:8px 12px;background:rgba(224,82,82,.1);border:1px solid rgba(224,82,82,.3);border-radius:6px;font-size:12px;color:#c0392b;font-weight:600">
+            ⚠️ Esta combinación ya existe
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" onclick="cerrarModal('modalMapeo')">Cancelar</button>
+          <button class="btn btn-primary" id="mpf-btn-guardar" onclick="guardarMapeo()">💾 Guardar</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ SUBPROCESOS ══ -->
+    <div class="page" id="page-subprocesos">
+      <div class="page-header">
+        <div><h1>🔀 Subprocesos</h1><p>Agrupa líneas en categorías (PRODUCCION, SERVICIOS, MATERIA PRIMA) para el dashboard</p></div>
+        <div class="page-header-actions">
+          <button class="btn btn-secondary" onclick="loadSubprocesos()">🔄 Recargar</button>
+          <button class="btn btn-primary" onclick="abrirSubprocesoModal()">＋ Asignar Línea</button>
+        </div>
+      </div>
+
+      <div class="table-area">
+        <div class="toolbar" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <input class="search-input" id="subprocesoSearch" placeholder="🔍 Buscar línea o subproceso..." oninput="renderSubprocesos()" style="flex:1;min-width:200px">
+          <span class="count-badge" id="subprocesoCount">— asignaciones</span>
+        </div>
+
+        <div id="subprocesoResumen" style="padding:14px 16px;background:rgba(0,152,212,.06);border-bottom:1px solid var(--border);font-size:12px;color:var(--muted)">
+          ⏳ Cargando resumen…
+        </div>
+
+        <div class="data-table-wrap" style="overflow-x:auto">
+          <table class="data-table">
+            <thead><tr>
+              <th style="width:80px">Acciones</th>
+              <th>Línea</th>
+              <th>SubProceso</th>
+              <th style="width:80px">Orden</th>
+            </tr></thead>
+            <tbody id="tbodySubprocesos">
+              <tr class="loading-row"><td colspan="4"><span class="spinner"></span>Cargando…</td></tr>
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
 
@@ -1927,6 +2078,44 @@ body {
   </div>
 </div>
 
+<!-- ══ MODAL SUBPROCESO ══ -->
+<div class="modal-overlay" id="modalSubproceso">
+  <div class="modal" style="max-width:500px">
+    <div class="modal-header">
+      <h2 id="modalSubprocesoTitle">🔀 Asignar Línea a SubProceso</h2>
+      <button class="modal-close" onclick="cerrarModal('modalSubproceso')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-field full">
+          <label class="form-label">Línea *</label>
+          <input class="form-input" id="sp-linea" placeholder="Ej: 1, EMPAQUE, SUBPRODUCTO"
+            list="dl-sp-linea" autocomplete="off">
+          <datalist id="dl-sp-linea"></datalist>
+        </div>
+        <div class="form-field full">
+          <label class="form-label">SubProceso *</label>
+          <input class="form-input" id="sp-subproceso" placeholder="Ej: PRODUCCION, SERVICIOS, MATERIA PRIMA"
+            list="dl-sp-subproceso" autocomplete="off">
+          <datalist id="dl-sp-subproceso">
+            <option value="PRODUCCION">
+            <option value="SERVICIOS">
+            <option value="MATERIA PRIMA">
+          </datalist>
+        </div>
+        <div class="form-field full">
+          <label class="form-label">Orden</label>
+          <input class="form-input" id="sp-orden" type="number" placeholder="0" value="0">
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="cerrarModal('modalSubproceso')">Cancelar</button>
+      <button class="btn btn-primary" onclick="guardarSubproceso()">💾 Guardar</button>
+    </div>
+  </div>
+</div>
+
 <!-- ══ MODAL PROCESOS ══ -->
 <div class="modal-overlay" id="modalProcesos">
   <div class="modal" style="max-width:640px">
@@ -2483,6 +2672,18 @@ function debounceEmp(turno)  { debounce('emp', () => loadEmpleados(turno)); }
 // ════════════════════════════════════════════════════
 async function loadCounts() {
   const db = getClient(); if (!db) return;
+  // Contar subprocesos
+  try {
+    var { count: cSub } = await db.from('lineas_subproceso').select('*', { count: 'exact', head: true }).eq('activo', true);
+    var el = document.getElementById('cnt-subprocesos');
+    if (el) el.textContent = (cSub || 0);
+  } catch(e){}
+  // Contar mapeo_procesos
+  try {
+    var { count: cMap } = await db.from('mapeo_procesos').select('*', { count: 'exact', head: true }).eq('activo', true);
+    var elMap = document.getElementById('cnt-mapeo');
+    if (elMap) elMap.textContent = (cMap || 0);
+  } catch(e){}
   // Tablas simples
   const tables = ['registros','noregistrar','audit_log'];
   for (const t of tables) {
@@ -3002,7 +3203,9 @@ function loadProduccion() {
   const active = document.querySelector('.page.active');
   if (!active) return;
   const id = active.id;
-  if (id === 'page-prod-procesos')     loadProdPage('procesos');
+  if (id === 'page-mapeo')            loadMapeo();
+  if (id === 'page-subprocesos')       loadSubprocesos();
+  else if (id === 'page-prod-procesos') loadProdPage('procesos');
   else if (id === 'page-prod-responsables') loadProdPage('responsables');
   else if (id === 'page-prod-lineas')  loadProdPage('lineas');
   else if (id === 'page-prod-especiales') loadProdPage('especiales');
@@ -5449,6 +5652,580 @@ async function ejecutarEliminarAuditLog() {
   loadCounts();
   // Restaurar acción original del botón confirmar
   document.getElementById('modalConfirm').querySelector('.btn-danger').onclick = ejecutarEliminar;
+}
+
+
+// ════════════════════════════════════════════════════
+//  SUBPROCESOS — gestión de asignación línea → subproceso
+// ════════════════════════════════════════════════════
+var _subprocesosCache = [];
+var _subprocesoEditingId = null;
+
+async function loadSubprocesos() {
+  var db = getClient(); if (!db) return;
+  var tbody = document.getElementById('tbodySubprocesos');
+  if (!tbody) return;
+  tbody.innerHTML = '<tr class="loading-row"><td colspan="4"><span class="spinner"></span>Cargando…</td></tr>';
+
+  var { data, error } = await db.from('lineas_subproceso')
+    .select('*').eq('activo', true).order('subproceso').order('orden').order('linea');
+
+  if (error) {
+    tbody.innerHTML = '<tr><td colspan="4"><div class="empty-state"><div class="ei">❌</div><p>Error: ' + esc(error.message) + '</p><p style="font-size:11px;margin-top:8px">¿Ya ejecutaste el SQL de la tabla?</p></div></td></tr>';
+    return;
+  }
+
+  _subprocesosCache = data || [];
+  renderSubprocesos();
+  renderSubprocesoResumen();
+
+  // Poblar datalist de líneas existentes
+  poblarDatalistLineasSubproceso();
+}
+
+async function poblarDatalistLineasSubproceso() {
+  var db = getClient(); if (!db) return;
+  // Cargar líneas desde produccion
+  var { data } = await db.from('produccion').select('linea')
+    .eq('activo', true).in('seccion', ['lineas','especiales']);
+  if (!data) return;
+  var lineas = [...new Set(data.map(function(r){ return r.linea; }).filter(Boolean))].sort();
+  var dl = document.getElementById('dl-sp-linea');
+  if (dl) dl.innerHTML = lineas.map(function(l){ return '<option value="' + esc(l) + '">'; }).join('');
+}
+
+function renderSubprocesos() {
+  var tbody = document.getElementById('tbodySubprocesos');
+  var badge = document.getElementById('subprocesoCount');
+  if (!tbody) return;
+
+  var search = (document.getElementById('subprocesoSearch').value || '').toLowerCase().trim();
+  var filtered = _subprocesosCache.filter(function(r) {
+    if (!search) return true;
+    return (r.linea || '').toLowerCase().includes(search) ||
+           (r.subproceso || '').toLowerCase().includes(search);
+  });
+
+  if (badge) badge.textContent = filtered.length + ' asignacion' + (filtered.length !== 1 ? 'es' : '');
+
+  if (!filtered.length) {
+    tbody.innerHTML = '<tr><td colspan="4"><div class="empty-state"><div class="ei">📭</div><p>Sin asignaciones</p></div></td></tr>';
+    return;
+  }
+
+  var colSub = {
+    'PRODUCCION':    'background:rgba(39,174,96,.15);color:#27ae60',
+    'SERVICIOS':     'background:rgba(0,152,212,.15);color:#0098d4',
+    'MATERIA PRIMA': 'background:rgba(230,126,34,.15);color:#e67e22'
+  };
+
+  tbody.innerHTML = filtered.map(function(r) {
+    var stl = colSub[r.subproceso] || 'background:rgba(142,68,173,.15);color:#8e44ad';
+    return '<tr>' +
+      '<td><div style="display:flex;gap:4px">' +
+        '<button class="btn-icon" title="Editar" onclick="abrirSubprocesoModal(' + JSON.stringify(r).replace(/"/g,'&quot;') + ')">✏️</button>' +
+        '<button class="btn-icon" title="Eliminar" onclick="eliminarSubproceso(\'' + r.id + '\',\'' + esc(r.linea) + '\')">🗑</button>' +
+      '</div></td>' +
+      '<td style="font-weight:700">' + esc(r.linea) + '</td>' +
+      '<td><span class="badge" style="' + stl + ';padding:3px 9px;border-radius:6px;font-size:11px;font-weight:600">' + esc(r.subproceso) + '</span></td>' +
+      '<td style="font-size:11px;color:var(--muted)">' + (r.orden || 0) + '</td>' +
+    '</tr>';
+  }).join('');
+}
+
+function renderSubprocesoResumen() {
+  var box = document.getElementById('subprocesoResumen');
+  if (!box) return;
+  var grupos = {};
+  _subprocesosCache.forEach(function(r) {
+    if (!grupos[r.subproceso]) grupos[r.subproceso] = [];
+    grupos[r.subproceso].push(r.linea);
+  });
+  var parts = Object.keys(grupos).sort().map(function(sub) {
+    return '<span style="font-weight:700;color:var(--text)">' + esc(sub) + '</span> · ' +
+           grupos[sub].map(esc).join(', ');
+  });
+  box.innerHTML = parts.length ? parts.join('  ┃  ') : 'Sin asignaciones registradas';
+}
+
+function abrirSubprocesoModal(r) {
+  _subprocesoEditingId = r && r.id ? r.id : null;
+  document.getElementById('modalSubprocesoTitle').textContent =
+    _subprocesoEditingId ? '✏️ Editar asignación' : '🔀 Asignar Línea a SubProceso';
+  document.getElementById('sp-linea').value      = r ? (r.linea || '') : '';
+  document.getElementById('sp-subproceso').value = r ? (r.subproceso || '') : '';
+  document.getElementById('sp-orden').value      = r ? (r.orden || 0) : 0;
+  document.getElementById('modalSubproceso').classList.add('open');
+  if (!r) poblarDatalistLineasSubproceso();
+}
+
+async function guardarSubproceso() {
+  var db = getClient(); if (!db) return;
+  var linea = (document.getElementById('sp-linea').value || '').trim().toUpperCase();
+  var sub   = (document.getElementById('sp-subproceso').value || '').trim().toUpperCase();
+  var orden = parseInt(document.getElementById('sp-orden').value || '0') || 0;
+
+  if (!linea || !sub) { toast('Línea y SubProceso son obligatorios', 'error'); return; }
+
+  // Verificar duplicado (mismo nombre de línea, si no estoy editando)
+  var dup = _subprocesosCache.find(function(r) {
+    return r.linea === linea && r.id !== _subprocesoEditingId;
+  });
+  if (dup) {
+    toast('La línea "' + linea + '" ya está asignada a "' + dup.subproceso + '". Edítala en vez de crear nueva.', 'error', 5000);
+    return;
+  }
+
+  var payload = { linea: linea, subproceso: sub, orden: orden, activo: true };
+  var resp;
+  if (_subprocesoEditingId) {
+    resp = await db.from('lineas_subproceso').update(payload).eq('id', _subprocesoEditingId);
+  } else {
+    resp = await db.from('lineas_subproceso').insert(payload);
+  }
+
+  if (resp.error) { toast('Error: ' + resp.error.message, 'error'); return; }
+  toast('✅ Asignación guardada', 'success');
+  cerrarModal('modalSubproceso');
+  loadSubprocesos();
+  loadCounts();
+}
+
+async function eliminarSubproceso(id, linea) {
+  if (!confirm('¿Eliminar la asignación de "' + linea + '"?')) return;
+  var db = getClient(); if (!db) return;
+  var { error } = await db.from('lineas_subproceso').delete().eq('id', id);
+  if (error) { toast('Error: ' + error.message, 'error'); return; }
+  toast('✅ Asignación eliminada', 'success');
+  loadSubprocesos();
+  loadCounts();
+}
+
+
+// ════════════════════════════════════════════════════════════
+//  MAPEO DE PROCESOS — Línea + Función + Especie + Producto
+// ════════════════════════════════════════════════════════════
+var _mapeoData = [];      // Todos los registros cargados
+var _mapeoFiltrado = [];  // Datos filtrados actuales
+var _mapeoPage = 1;
+var _mapeoPerPage = 50;
+var _mapeoSort = { col: 'linea', asc: true };
+
+// Comparador alfanumérico de líneas (1 < 1B < 2 < 3 < EMPAQUE...)
+function _cmpLineaMP(a, b) {
+  function parseLin(v) {
+    var s = String(v||'').trim().toUpperCase();
+    if(!s) return [2,0,''];
+    var m = s.match(/^(\d+)([A-Z]*)$/);
+    if(m) return [0, parseInt(m[1],10), m[2]];
+    return [1, 0, s];
+  }
+  var pa=parseLin(a), pb=parseLin(b);
+  if(pa[0]!==pb[0]) return pa[0]-pb[0];
+  if(pa[1]!==pb[1]) return pa[1]-pb[1];
+  if(pa[2]!==pb[2]){
+    if(!pa[2]) return -1; if(!pb[2]) return 1;
+    return pa[2].localeCompare(pb[2],'es');
+  }
+  return 0;
+}
+
+async function loadMapeo() {
+  var db = getClient(); if (!db) return;
+  var tbody = document.getElementById('tbodyMapeo');
+  if (tbody) tbody.innerHTML = '<tr class="loading-row"><td colspan="5"><span class="spinner"></span>Cargando…</td></tr>';
+
+  // Paginar para superar límite 1000
+  var all = [], page = 0, more = true;
+  while (more) {
+    var ini = page * 1000;
+    var { data, error } = await db.from('mapeo_procesos')
+      .select('*')
+      .eq('activo', true)
+      .order('linea').order('funcion').order('especie').order('producto')
+      .range(ini, ini + 999);
+    if (error) { toast('Error: '+error.message, 'error'); return; }
+    all = all.concat(data || []);
+    if (!data || data.length < 1000) more = false; else page++;
+  }
+  _mapeoData = all;
+
+  // Poblar filtros en cascada
+  mapeoPoblarFiltros();
+  // Actualizar contador del sidebar
+  var cnt = document.getElementById('cnt-mapeo');
+  if (cnt) cnt.textContent = _mapeoData.length;
+  // Filtrar y renderizar
+  mapeoFiltrar();
+}
+
+function mapeoPoblarFiltros() {
+  // Obtener valores únicos según los filtros actuales (en cascada)
+  var fLin = document.getElementById('mpFiltroLinea').value;
+  var fFun = document.getElementById('mpFiltroFuncion').value;
+  var fEsp = document.getElementById('mpFiltroEspecie').value;
+
+  var lineas    = new Set();
+  var funciones = new Set();
+  var especies  = new Set();
+  var productos = new Set();
+
+  _mapeoData.forEach(function(r) {
+    lineas.add(r.linea);
+    if (!fLin || r.linea === fLin) {
+      funciones.add(r.funcion);
+      if (!fFun || r.funcion === fFun) {
+        if (r.especie) especies.add(r.especie);
+        if (!fEsp || r.especie === fEsp) {
+          if (r.producto) productos.add(r.producto);
+        }
+      }
+    }
+  });
+
+  // Poblar cada select preservando selección actual
+  _poblarSelectMP('mpFiltroLinea', [...lineas].sort(_cmpLineaMP), 'Todas las líneas');
+  _poblarSelectMP('mpFiltroFuncion', [...funciones].sort(), 'Todas las funciones');
+  _poblarSelectMP('mpFiltroEspecie', [...especies].sort(), 'Todas las especies');
+  _poblarSelectMP('mpFiltroProducto', [...productos].sort(), 'Todos los productos');
+}
+
+function _poblarSelectMP(selId, valores, placeholder) {
+  var sel = document.getElementById(selId);
+  if (!sel) return;
+  var prev = sel.value;
+  sel.innerHTML = '<option value="">' + placeholder + '</option>';
+  valores.forEach(function(v) {
+    if (!v) return;
+    var opt = document.createElement('option');
+    opt.value = v; opt.textContent = v;
+    sel.appendChild(opt);
+  });
+  if (prev && valores.includes(prev)) sel.value = prev;
+}
+
+function mapeoFiltrar() {
+  var fLin = (document.getElementById('mpFiltroLinea').value || '').trim();
+  var fFun = (document.getElementById('mpFiltroFuncion').value || '').trim();
+  var fEsp = (document.getElementById('mpFiltroEspecie').value || '').trim();
+  var fPro = (document.getElementById('mpFiltroProducto').value || '').trim();
+  var busq = (document.getElementById('mpSearch').value || '').trim().toUpperCase();
+
+  _mapeoFiltrado = _mapeoData.filter(function(r) {
+    if (fLin && r.linea   !== fLin) return false;
+    if (fFun && r.funcion !== fFun) return false;
+    if (fEsp && r.especie !== fEsp) return false;
+    if (fPro && r.producto !== fPro) return false;
+    if (busq) {
+      var blob = ((r.linea||'')+' '+(r.funcion||'')+' '+(r.especie||'')+' '+(r.producto||'')).toUpperCase();
+      if (!blob.includes(busq)) return false;
+    }
+    return true;
+  });
+
+  // Ordenar
+  _mapeoFiltrado.sort(function(a, b) {
+    var col = _mapeoSort.col, asc = _mapeoSort.asc;
+    var r;
+    if (col === 'linea') r = _cmpLineaMP(a.linea, b.linea);
+    else r = String(a[col]||'').localeCompare(String(b[col]||''),'es');
+    return asc ? r : -r;
+  });
+
+  // Actualizar filtros en cascada
+  mapeoPoblarFiltros();
+
+  _mapeoPage = 1;
+  renderMapeo();
+}
+
+function mapeoSort(col) {
+  if (_mapeoSort.col === col) _mapeoSort.asc = !_mapeoSort.asc;
+  else { _mapeoSort.col = col; _mapeoSort.asc = true; }
+  // Limpiar indicadores
+  ['linea','funcion','especie','producto'].forEach(function(c) {
+    var el = document.getElementById('mp-sort-'+c);
+    if (el) el.textContent = '';
+  });
+  var arrow = document.getElementById('mp-sort-'+col);
+  if (arrow) arrow.textContent = _mapeoSort.asc ? '↑' : '↓';
+  mapeoFiltrar();
+}
+
+function renderMapeo() {
+  var tbody = document.getElementById('tbodyMapeo');
+  if (!tbody) return;
+
+  var total = _mapeoFiltrado.length;
+  var totalPags = Math.max(1, Math.ceil(total / _mapeoPerPage));
+  if (_mapeoPage > totalPags) _mapeoPage = totalPags;
+  var ini = (_mapeoPage - 1) * _mapeoPerPage;
+  var fin = Math.min(ini + _mapeoPerPage, total);
+  var slice = _mapeoFiltrado.slice(ini, fin);
+
+  var esc = function(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');};
+
+  if (!slice.length) {
+    tbody.innerHTML = '<tr><td colspan="5"><div class="empty-state"><div class="ei">🔍</div><p>Sin resultados con los filtros actuales</p></div></td></tr>';
+  } else {
+    tbody.innerHTML = slice.map(function(r) {
+      return '<tr>' +
+        '<td><button class="row-btn row-edit" onclick="editarMapeo(\''+r.id+'\')" title="Editar">✏️</button>' +
+        '<button class="row-btn row-del" onclick="eliminarMapeo(\''+r.id+'\')" title="Eliminar">🗑</button></td>' +
+        '<td style="font-weight:600">'+esc(r.linea)+'</td>' +
+        '<td>'+esc(r.funcion)+'</td>' +
+        '<td>'+esc(r.especie||'—')+'</td>' +
+        '<td>'+esc(r.producto||'—')+'</td>' +
+      '</tr>';
+    }).join('');
+  }
+
+  // Resumen
+  var resumen = document.getElementById('mapeoResumen');
+  if (resumen) {
+    var unicos = {
+      lineas: new Set(_mapeoFiltrado.map(function(r){return r.linea;})).size,
+      funciones: new Set(_mapeoFiltrado.map(function(r){return r.funcion;})).size,
+      especies: new Set(_mapeoFiltrado.map(function(r){return r.especie;}).filter(Boolean)).size,
+      productos: new Set(_mapeoFiltrado.map(function(r){return r.producto;}).filter(Boolean)).size
+    };
+    resumen.innerHTML =
+      '<span><b>'+total+'</b> combinaciones</span>' +
+      '<span>· <b>'+unicos.lineas+'</b> líneas</span>' +
+      '<span>· <b>'+unicos.funciones+'</b> funciones</span>' +
+      '<span>· <b>'+unicos.especies+'</b> especies</span>' +
+      '<span>· <b>'+unicos.productos+'</b> productos</span>';
+  }
+
+  // Paginación
+  document.getElementById('mapeoPagInfo').textContent =
+    'Mostrando ' + (total ? (ini+1) : 0) + '-' + fin + ' de ' + total;
+
+  var nums = document.getElementById('mapeoPagNums');
+  nums.innerHTML = '';
+  var maxBtns = 5;
+  var start = Math.max(1, _mapeoPage - Math.floor(maxBtns/2));
+  var end = Math.min(totalPags, start + maxBtns - 1);
+  start = Math.max(1, end - maxBtns + 1);
+  for (var p = start; p <= end; p++) {
+    var b = document.createElement('button');
+    b.className = 'btn btn-sm';
+    b.textContent = p;
+    if (p === _mapeoPage) b.style.background = 'var(--accent2,#0098d4)';
+    var pp = p;
+    b.onclick = (function(x){return function(){ _mapeoPage = x; renderMapeo(); };})(pp);
+    nums.appendChild(b);
+  }
+}
+
+function mapeoPagPrev() { if (_mapeoPage > 1) { _mapeoPage--; renderMapeo(); } }
+function mapeoPagNext() {
+  var totalPags = Math.ceil(_mapeoFiltrado.length / _mapeoPerPage);
+  if (_mapeoPage < totalPags) { _mapeoPage++; renderMapeo(); }
+}
+
+function mapeoLimpiarFiltros() {
+  ['mpFiltroLinea','mpFiltroFuncion','mpFiltroEspecie','mpFiltroProducto'].forEach(function(id) {
+    document.getElementById(id).value = '';
+  });
+  document.getElementById('mpSearch').value = '';
+  mapeoFiltrar();
+}
+
+// ── Modal nueva/editar combinación ──────────────────────────
+function abrirMapeoModal() {
+  _editingId = null;
+  document.getElementById('modalMapeoTitle').textContent = '🗺 Nueva combinación';
+  ['mpf-linea','mpf-funcion','mpf-especie','mpf-producto'].forEach(function(id) {
+    document.getElementById(id).value = '';
+  });
+  document.getElementById('mpf-dup-warn').style.display = 'none';
+  document.getElementById('mpf-btn-guardar').disabled = false;
+  mapeoPoblarDatalist();
+  document.getElementById('modalMapeo').classList.add('open');
+}
+
+function editarMapeo(id) {
+  var r = _mapeoData.find(function(x){ return x.id === id; });
+  if (!r) return;
+  _editingId = id;
+  document.getElementById('modalMapeoTitle').textContent = '✏️ Editar combinación';
+  document.getElementById('mpf-linea').value    = r.linea    || '';
+  document.getElementById('mpf-funcion').value  = r.funcion  || '';
+  document.getElementById('mpf-especie').value  = r.especie  || '';
+  document.getElementById('mpf-producto').value = r.producto || '';
+  document.getElementById('mpf-dup-warn').style.display = 'none';
+  document.getElementById('mpf-btn-guardar').disabled = false;
+  mapeoPoblarDatalist();
+  document.getElementById('modalMapeo').classList.add('open');
+}
+
+function mapeoPoblarDatalist() {
+  var sets = { linea:new Set(), funcion:new Set(), especie:new Set(), producto:new Set() };
+  _mapeoData.forEach(function(r) {
+    if(r.linea) sets.linea.add(r.linea);
+    if(r.funcion) sets.funcion.add(r.funcion);
+    if(r.especie) sets.especie.add(r.especie);
+    if(r.producto) sets.producto.add(r.producto);
+  });
+  ['linea','funcion','especie','producto'].forEach(function(c) {
+    var dl = document.getElementById('dl-mpf-'+c);
+    if (!dl) return;
+    var vals = [...sets[c]];
+    if (c === 'linea') vals.sort(_cmpLineaMP); else vals.sort();
+    dl.innerHTML = vals.map(function(v){
+      return '<option value="'+String(v).replace(/"/g,'&quot;')+'">';
+    }).join('');
+  });
+}
+
+function mapeoVerificarDup() {
+  var lin = (document.getElementById('mpf-linea').value || '').trim().toUpperCase();
+  var fun = (document.getElementById('mpf-funcion').value || '').trim().toUpperCase();
+  var esp = (document.getElementById('mpf-especie').value || '').trim().toUpperCase();
+  var pro = (document.getElementById('mpf-producto').value || '').trim().toUpperCase();
+  var warn = document.getElementById('mpf-dup-warn');
+  var btn  = document.getElementById('mpf-btn-guardar');
+  if (!lin || !fun) { warn.style.display='none'; btn.disabled=false; return; }
+  if (_editingId) { warn.style.display='none'; btn.disabled=false; return; }
+
+  var dup = _mapeoData.some(function(r) {
+    return (r.linea||'').toUpperCase() === lin &&
+           (r.funcion||'').toUpperCase() === fun &&
+           (r.especie||'').toUpperCase() === esp &&
+           (r.producto||'').toUpperCase() === pro;
+  });
+  warn.style.display = dup ? '' : 'none';
+  btn.disabled = dup;
+}
+
+async function guardarMapeo() {
+  var db = getClient(); if (!db) return;
+  var vals = {
+    linea:    (document.getElementById('mpf-linea').value || '').trim(),
+    funcion:  (document.getElementById('mpf-funcion').value || '').trim(),
+    especie:  (document.getElementById('mpf-especie').value || '').trim() || null,
+    producto: (document.getElementById('mpf-producto').value || '').trim() || null
+  };
+  if (!vals.linea || !vals.funcion) { toast('Línea y Función son obligatorios', 'error'); return; }
+
+  if (_editingId) {
+    var { error } = await db.from('mapeo_procesos').update(vals).eq('id', _editingId);
+    if (error) { toast('Error: '+error.message, 'error'); return; }
+    toast('✅ Actualizado', 'success');
+  } else {
+    var { error } = await db.from('mapeo_procesos').insert(vals);
+    if (error) {
+      if (String(error.message).includes('duplicate')) toast('Esta combinación ya existe', 'error');
+      else toast('Error: '+error.message, 'error');
+      return;
+    }
+    toast('✅ Combinación agregada', 'success');
+  }
+  cerrarModal('modalMapeo');
+  loadMapeo();
+}
+
+async function eliminarMapeo(id) {
+  var r = _mapeoData.find(function(x){ return x.id === id; });
+  if (!r) return;
+  if (!confirm('¿Eliminar la combinación '+r.linea+' · '+r.funcion+'?')) return;
+  var db = getClient(); if (!db) return;
+  var { error } = await db.from('mapeo_procesos').delete().eq('id', id);
+  if (error) { toast('Error: '+error.message, 'error'); return; }
+  toast('✅ Eliminado', 'success');
+  loadMapeo();
+}
+
+// ── Importar Excel ──────────────────────────────────────────
+async function mapeoImportarExcel(event) {
+  var file = event.target.files[0];
+  if (!file) return;
+  if (typeof XLSX === 'undefined') { toast('Librería Excel no cargada', 'error'); return; }
+
+  toast('⏳ Leyendo Excel...', 'info');
+  var reader = new FileReader();
+  reader.onload = async function(e) {
+    try {
+      var wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
+      var sheet = wb.Sheets[wb.SheetNames[0]];
+      var rows = XLSX.utils.sheet_to_json(sheet, { defval: '', raw: false });
+
+      if (!rows.length) { toast('El archivo está vacío', 'warn'); return; }
+
+      // Detectar columnas: aceptar Linea/Línea, Funcion/Función, Especie, Producto
+      var first = rows[0];
+      var keys = Object.keys(first).reduce(function(acc, k) {
+        var nk = k.toLowerCase().replace('í','i').replace('ó','o').trim();
+        acc[nk] = k;
+        return acc;
+      }, {});
+
+      var kLinea = keys['linea'] || keys['línea'];
+      var kFuncion = keys['funcion'] || keys['función'];
+      var kEspecie = keys['especie'];
+      var kProducto = keys['producto'];
+
+      if (!kLinea || !kFuncion) {
+        toast('El Excel debe tener columnas "Linea" y "Función"', 'error', 5000);
+        document.getElementById('mapeoFile').value = '';
+        return;
+      }
+
+      // Construir registros
+      var nuevos = [];
+      var vistos = new Set();
+      rows.forEach(function(r) {
+        var lin = String(r[kLinea] || '').trim();
+        var fun = String(r[kFuncion] || '').trim();
+        var esp = kEspecie ? String(r[kEspecie] || '').trim() : '';
+        var pro = kProducto ? String(r[kProducto] || '').trim() : '';
+        if (!lin || !fun) return;
+        var key = lin+'|'+fun+'|'+esp+'|'+pro;
+        if (vistos.has(key)) return;
+        vistos.add(key);
+        nuevos.push({ linea: lin, funcion: fun, especie: esp || null, producto: pro || null });
+      });
+
+      if (!nuevos.length) { toast('No se encontraron filas válidas', 'warn'); return; }
+
+      // Set de combinaciones existentes
+      var existentes = new Set(_mapeoData.map(function(r) {
+        return (r.linea||'')+'|'+(r.funcion||'')+'|'+(r.especie||'')+'|'+(r.producto||'');
+      }));
+
+      var aInsertar = nuevos.filter(function(n) {
+        var key = (n.linea||'')+'|'+(n.funcion||'')+'|'+(n.especie||'')+'|'+(n.producto||'');
+        return !existentes.has(key);
+      });
+
+      if (!aInsertar.length) {
+        toast('Todas las combinaciones ya existen ('+nuevos.length+' filas leídas)', 'info', 4000);
+        document.getElementById('mapeoFile').value = '';
+        return;
+      }
+
+      toast('⏳ Insertando '+aInsertar.length+' combinaciones nuevas...', 'info');
+
+      // Insertar en batches de 200
+      var db = getClient(); if (!db) return;
+      var BATCH = 200, ok = 0, errs = 0;
+      for (var i = 0; i < aInsertar.length; i += BATCH) {
+        var batch = aInsertar.slice(i, i + BATCH);
+        var { error } = await db.from('mapeo_procesos').insert(batch);
+        if (error) { errs += batch.length; console.error(error); }
+        else ok += batch.length;
+      }
+
+      toast('✅ Importación: '+ok+' nuevos, '+(nuevos.length-aInsertar.length)+' ya existían'+(errs?', '+errs+' errores':''), 'success', 6000);
+      document.getElementById('mapeoFile').value = '';
+      loadMapeo();
+    } catch (err) {
+      console.error(err);
+      toast('Error: '+err.message, 'error');
+    }
+  };
+  reader.readAsArrayBuffer(file);
 }
 
 </script>
