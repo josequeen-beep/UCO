@@ -1181,6 +1181,13 @@ body {
           <select class="form-select" id="mpFiltroLinea" onchange="mapeoFiltrar()" style="min-width:140px">
             <option value="">Todas las líneas</option>
           </select>
+          <select class="form-select" id="mpFiltroCategoria" onchange="mapeoFiltrar()" style="min-width:160px">
+            <option value="">Todas las categorías</option>
+            <option value="PRODUCCION">PRODUCCION</option>
+            <option value="SERVICIOS">SERVICIOS</option>
+            <option value="MATERIA PRIMA">MATERIA PRIMA</option>
+            <option value="SIN ASIGNAR">SIN ASIGNAR</option>
+          </select>
           <select class="form-select" id="mpFiltroFuncion" onchange="mapeoFiltrar()" style="min-width:180px">
             <option value="">Todas las funciones</option>
           </select>
@@ -1203,12 +1210,13 @@ body {
             <thead><tr>
               <th style="width:90px">Acciones</th>
               <th onclick="mapeoSort('linea')" style="cursor:pointer">Línea <span id="mp-sort-linea"></span></th>
+              <th onclick="mapeoSort('categoria')" style="cursor:pointer">Categoría <span id="mp-sort-categoria"></span></th>
               <th onclick="mapeoSort('funcion')" style="cursor:pointer">Función <span id="mp-sort-funcion"></span></th>
               <th onclick="mapeoSort('especie')" style="cursor:pointer">Especie <span id="mp-sort-especie"></span></th>
               <th onclick="mapeoSort('producto')" style="cursor:pointer">Producto <span id="mp-sort-producto"></span></th>
             </tr></thead>
             <tbody id="tbodyMapeo">
-              <tr class="loading-row"><td colspan="5"><span class="spinner"></span>Cargando…</td></tr>
+              <tr class="loading-row"><td colspan="6"><span class="spinner"></span>Cargando…</td></tr>
             </tbody>
           </table>
         </div>
@@ -5830,10 +5838,21 @@ function _cmpLineaMP(a, b) {
   return 0;
 }
 
+// Clasifica una línea en su categoría para Mapeo de Procesos
+function _mpCategoria(linea) {
+  var l = String(linea || '').trim().toUpperCase();
+  if (l === 'SERVICIOS') return 'SERVICIOS';
+  if (l === 'MPRIMA')    return 'MATERIA PRIMA';
+  var prod = ['1','1B','2','3','EMPAQUE','SUBPRODUCTO','S/L'];
+  if (prod.indexOf(l) !== -1) return 'PRODUCCION';
+  if (/^\d/.test(l)) return 'PRODUCCION';
+  return 'SIN ASIGNAR';
+}
+
 async function loadMapeo() {
   var db = getClient(); if (!db) return;
   var tbody = document.getElementById('tbodyMapeo');
-  if (tbody) tbody.innerHTML = '<tr class="loading-row"><td colspan="5"><span class="spinner"></span>Cargando…</td></tr>';
+  if (tbody) tbody.innerHTML = '<tr class="loading-row"><td colspan="6"><span class="spinner"></span>Cargando…</td></tr>';
 
   // Paginar para superar límite 1000
   var all = [], page = 0, more = true;
@@ -5906,6 +5925,7 @@ function _poblarSelectMP(selId, valores, placeholder) {
 
 function mapeoFiltrar() {
   var fLin = (document.getElementById('mpFiltroLinea').value || '').trim();
+  var fCat = (document.getElementById('mpFiltroCategoria') ? document.getElementById('mpFiltroCategoria').value : '').trim();
   var fFun = (document.getElementById('mpFiltroFuncion').value || '').trim();
   var fEsp = (document.getElementById('mpFiltroEspecie').value || '').trim();
   var fPro = (document.getElementById('mpFiltroProducto').value || '').trim();
@@ -5913,11 +5933,12 @@ function mapeoFiltrar() {
 
   _mapeoFiltrado = _mapeoData.filter(function(r) {
     if (fLin && r.linea   !== fLin) return false;
+    if (fCat && _mpCategoria(r.linea) !== fCat) return false;
     if (fFun && r.funcion !== fFun) return false;
     if (fEsp && r.especie !== fEsp) return false;
     if (fPro && r.producto !== fPro) return false;
     if (busq) {
-      var blob = ((r.linea||'')+' '+(r.funcion||'')+' '+(r.especie||'')+' '+(r.producto||'')).toUpperCase();
+      var blob = ((r.linea||'')+' '+_mpCategoria(r.linea)+' '+(r.funcion||'')+' '+(r.especie||'')+' '+(r.producto||'')).toUpperCase();
       if (!blob.includes(busq)) return false;
     }
     return true;
@@ -5928,6 +5949,7 @@ function mapeoFiltrar() {
     var col = _mapeoSort.col, asc = _mapeoSort.asc;
     var r;
     if (col === 'linea') r = _cmpLineaMP(a.linea, b.linea);
+    else if (col === 'categoria') r = _mpCategoria(a.linea).localeCompare(_mpCategoria(b.linea),'es');
     else r = String(a[col]||'').localeCompare(String(b[col]||''),'es');
     return asc ? r : -r;
   });
@@ -5966,13 +5988,16 @@ function renderMapeo() {
   var esc = function(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');};
 
   if (!slice.length) {
-    tbody.innerHTML = '<tr><td colspan="5"><div class="empty-state"><div class="ei">🔍</div><p>Sin resultados con los filtros actuales</p></div></td></tr>';
+    tbody.innerHTML = '<tr><td colspan="6"><div class="empty-state"><div class="ei">🔍</div><p>Sin resultados con los filtros actuales</p></div></td></tr>';
   } else {
     tbody.innerHTML = slice.map(function(r) {
+      var cat = _mpCategoria(r.linea);
+      var catColor = cat==='PRODUCCION'?'#27ae60':cat==='SERVICIOS'?'#0098d4':cat==='MATERIA PRIMA'?'#e67e22':'#888';
       return '<tr>' +
         '<td><button class="row-btn row-edit" onclick="editarMapeo(\''+r.id+'\')" title="Editar">✏️</button>' +
         '<button class="row-btn row-del" onclick="eliminarMapeo(\''+r.id+'\')" title="Eliminar">🗑</button></td>' +
         '<td style="font-weight:600">'+esc(r.linea)+'</td>' +
+        '<td><span style="font-size:11px;font-weight:700;padding:2px 7px;border-radius:10px;background:'+catColor+'22;color:'+catColor+';letter-spacing:.3px">'+cat+'</span></td>' +
         '<td>'+esc(r.funcion)+'</td>' +
         '<td>'+esc(r.especie||'—')+'</td>' +
         '<td>'+esc(r.producto||'—')+'</td>' +
@@ -6025,7 +6050,7 @@ function mapeoPagNext() {
 }
 
 function mapeoLimpiarFiltros() {
-  ['mpFiltroLinea','mpFiltroFuncion','mpFiltroEspecie','mpFiltroProducto'].forEach(function(id) {
+  ['mpFiltroLinea','mpFiltroCategoria','mpFiltroFuncion','mpFiltroEspecie','mpFiltroProducto'].forEach(function(id) {
     document.getElementById(id).value = '';
   });
   document.getElementById('mpSearch').value = '';
