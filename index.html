@@ -6929,12 +6929,12 @@ function renderPivotBody() {
   });
   var colsTotal = dias.map(function(d) {
     var v = _totByDay[d.fecha];
-    return '<td class="pivot-num" style="color:#fff;font-size:14px">'+(v||'—')+'</td>';
+    return '<td class="pivot-num">'+(v||'—')+'</td>';
   }).join('');
   filas += '<tr class="pivot-total">' +
-    '<td style="font-size:13px;font-weight:700">📊 Total general</td>' +
+    '<td>📊 Total general</td>' +
     colsTotal +
-    '<td class="pivot-num" style="color:#fff;font-size:14px">'+(_gt||'—')+'</td>' +
+    '<td class="pivot-num">'+(_gt||'—')+'</td>' +
   '</tr>';
 
   tbody.innerHTML = filas || '<tr><td colspan="'+(dias.length+2)+'"><div class="dash-loading">Sin datos</div></td></tr>';
