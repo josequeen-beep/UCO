@@ -1236,8 +1236,9 @@ input.req-error,select.req-error{
 .emp-card-change:hover{color:var(--accent)}
 
 /* ── TABLA DINÁMICA PIVOT (jerárquica expandible) ────────────── */
-.pivot-table .pivot-row{cursor:pointer;transition:background .1s}
-.pivot-table .pivot-row:hover{background:rgba(0,152,212,.06)}
+.pivot-table .pivot-row{cursor:pointer}
+.pivot-table .pivot-l1:hover td{background:rgba(39,174,96,.12)}
+.pivot-table .pivot-l2:hover td,.pivot-table .pivot-l3:hover td{background:rgba(0,152,212,.06)}
 .pivot-table .pivot-toggle{
   display:inline-block;width:16px;height:16px;line-height:14px;text-align:center;
   border:1px solid currentColor;border-radius:3px;font-size:11px;font-weight:700;
@@ -6830,9 +6831,10 @@ function renderPivotTable(regs, dias, filtro) {
   _pivotData = data;
   if (badge) badge.textContent = data.granTotal + ' registro'+(data.granTotal!==1?'s':'');
 
-  // Por defecto: expandir nivel 1 (subprocesos), colapsar nivel 2 (líneas)
+  // Por defecto: colapsar todo — solo se muestran las 3 categorías
+  // (el usuario expande con el botón o haciendo clic en la fila)
   if (Object.keys(_pivotExpand).length === 0) {
-    Object.keys(data.l1).forEach(function(k1){ _pivotExpand['L1::'+k1] = true; });
+    // nada expandido → solo se ven L1
   }
 
   renderPivotBody();
