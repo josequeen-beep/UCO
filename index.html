@@ -2719,6 +2719,63 @@ body.noche-mode .modal-field input,body.noche-mode .modal-field select{color-sch
     </div>
   </div>
 
+  <!-- Registros agrupados por SubProceso (PRODUCCION, SERVICIOS, MATERIA PRIMA) -->
+  <div class="dash-card-full">
+    <div class="dash-card-header">
+      <span>🔀</span>
+      <h4>Registros por SubProceso · Línea · Día</h4>
+      <span class="dash-card-badge" id="badgeSubproc" style="background:var(--t-accent2,#0098d4)">0 registros</span>
+    </div>
+    <div class="combo-wrap">
+      <table class="combo-table" id="tablaSubproc">
+        <thead id="theadSubproc"></thead>
+        <tbody id="tbodySubproc">
+          <tr><td colspan="3"><div class="dash-loading">Calculando agrupación...</div></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ── NUEVO: Producción por Especie/Producto (tabla dinámica) ── -->
+  <div class="dash-card-full">
+    <div class="dash-card-header">
+      <span>🐟</span>
+      <h4>Producción por Especie · Producto — Semana</h4>
+      <span class="dash-card-badge" id="badgeMapeoDash" style="background:var(--t-accent2,#0098d4)">—</span>
+    </div>
+    <!-- Filtros en cascada -->
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:10px 16px;background:rgba(0,152,212,.04);border-bottom:1px solid var(--border)">
+      <select id="mapDashLinea" onchange="mapDashFiltrar()" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--input-bg);color:var(--text);font-size:12px;min-width:110px">
+        <option value="">Todas líneas</option>
+      </select>
+      <select id="mapDashFuncion" onchange="mapDashFiltrar()" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--input-bg);color:var(--text);font-size:12px;min-width:140px">
+        <option value="">Todas funciones</option>
+      </select>
+      <select id="mapDashEspecie" onchange="mapDashFiltrar()" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--input-bg);color:var(--text);font-size:12px;min-width:130px">
+        <option value="">Todas especies</option>
+      </select>
+      <select id="mapDashProducto" onchange="mapDashFiltrar()" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--input-bg);color:var(--text);font-size:12px;min-width:180px">
+        <option value="">Todos productos</option>
+      </select>
+      <button onclick="mapDashLimpiar()" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:transparent;color:var(--muted);font-size:11px;cursor:pointer">✕ Limpiar</button>
+      <span id="mapDashGroupLabel" style="margin-left:auto;font-size:11px;color:var(--muted)">Agrupar por:</span>
+      <select id="mapDashGroup" onchange="mapDashFiltrar()" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--input-bg);color:var(--text);font-size:12px">
+        <option value="especie_producto">Especie · Producto</option>
+        <option value="linea_especie">Línea · Especie</option>
+        <option value="funcion">Función</option>
+        <option value="linea_funcion">Línea · Función</option>
+      </select>
+    </div>
+    <div class="combo-wrap">
+      <table class="combo-table" id="tablaMapeoDash">
+        <thead id="theadMapeoDash"></thead>
+        <tbody id="tbodyMapeoDash">
+          <tr><td colspan="9"><div class="dash-loading">Selecciona filtros para ver datos...</div></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
   <!-- Totales por Centro de Costo — semana -->
   <div class="dash-card-full">
     <div class="dash-card-header">
@@ -3141,6 +3198,7 @@ function onLineaChange(linea){
 // ══════════════════════════════════════════
 function cargarListas(){
   getListData().then(aplicarListas).catch(e=>showToast('❌ Error al cargar listas: '+(e.message||e),'error'));
+  cargarMapaSubproceso();
 }
 
 function aplicarListas(d){
@@ -4953,7 +5011,13 @@ function aplicarFiltroDash(){
   // KPIs — siempre con registros completos (sin filtrar) para mostrar los dos turnos
   renderKpis(_dashRegs, filtro);
   renderTablaCombinada(regs, _dashDias, filtro);
+  renderTablaSubproceso(regs, _dashDias, filtro);
   renderTotalesCC(regs, _dashDias, filtro);
+  // Nueva: producción por especie/producto con filtros dinámicos
+  _mapDashRegs = regs;
+  _mapDashFiltroTurno = filtro;
+  mapDashPoblarFiltros();
+  mapDashFiltrar();
   // Limpiar caché de empleados para que ausentes recargue con el turno correcto
   ['Día','Tarde','Noche','todos'].forEach(t => _cDelPfx('emp_t'+t));
   cargarAusenciasSemana();
@@ -5061,6 +5125,152 @@ function renderTablaCombinada(regs, dias, filtro){
 }
 
 // ── Totales por Centro de Costo — semana (mismo rango que tabla combinada) ──
+// ── Mapeo de líneas → subprocesos (cache local) ──────────────
+var _mapaSubproceso = {};
+var _ordenSubproceso = {};
+
+async function cargarMapaSubproceso(){
+  try {
+    var db = _sbDb(); if(!db) return;
+    var {data, error} = await db.from('lineas_subproceso')
+      .select('linea,subproceso,orden').eq('activo', true);
+    if(error || !data) return;
+    _mapaSubproceso = {};
+    _ordenSubproceso = {};
+    data.forEach(function(r){
+      _mapaSubproceso[String(r.linea).trim().toUpperCase()] = r.subproceso;
+      _ordenSubproceso[String(r.linea).trim().toUpperCase()] = r.orden || 0;
+    });
+  } catch(e){ console.warn('[SUBPROC]', e.message); }
+}
+
+// ── Registros agrupados por SubProceso · Línea · Día ─────────
+function renderTablaSubproceso(regs, dias, filtro){
+  var thead = document.getElementById('theadSubproc');
+  var tbody = document.getElementById('tbodySubproc');
+  var badge = document.getElementById('badgeSubproc');
+  if(!thead || !tbody) return;
+
+  // Cabecera idéntica a la tabla combinada
+  thead.innerHTML = '<tr>' +
+    '<th class="th-left" style="min-width:140px">SubProceso</th>' +
+    '<th class="th-left" style="min-width:120px">Línea</th>' +
+    dias.map(function(d){ return '<th>'+d.label+'</th>'; }).join('') +
+  '</tr>';
+
+  // Agrupar: subproceso → línea → fecha → count (deduplicado por código+fecha+turno)
+  var mapa = {}, totalDia = {}, granTotal = 0;
+  dias.forEach(function(d){ totalDia[d.fecha] = 0; });
+
+  var yaContado = new Set();
+  regs.forEach(function(r){
+    if(filtro && r[3] && String(r[3]).toLowerCase() !== filtro) return;
+    var fec = String(r[1]||'').substring(0,10);
+    if(totalDia[fec] === undefined) return;
+    var lin = String(r[4]||'').trim().toUpperCase();
+    var cod = String(r[5]||'').trim().toLowerCase();
+    var tur = String(r[3]||'').trim().toLowerCase();
+
+    if(cod){
+      var clave = cod+'|'+fec+'|'+tur;
+      if(yaContado.has(clave)) return;
+      yaContado.add(clave);
+    }
+
+    var sub = _mapaSubproceso[lin] || 'SIN ASIGNAR';
+    if(!mapa[sub]) mapa[sub] = {};
+    if(!mapa[sub][lin]) mapa[sub][lin] = {};
+    mapa[sub][lin][fec] = (mapa[sub][lin][fec] || 0) + 1;
+    totalDia[fec]++;
+    granTotal++;
+  });
+
+  // Orden de subprocesos: PRODUCCION primero, luego alfabético
+  var ordenSub = function(a){
+    if(a === 'PRODUCCION') return 0;
+    if(a === 'SERVICIOS')  return 1;
+    if(a === 'MATERIA PRIMA') return 2;
+    if(a === 'SIN ASIGNAR') return 99;
+    return 50;
+  };
+
+  var x = function(v){ return String(v||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); };
+  var filas = '';
+
+  var subprocesos = Object.keys(mapa).sort(function(a,b){
+    var oa = ordenSub(a), ob = ordenSub(b);
+    if(oa !== ob) return oa - ob;
+    return a.localeCompare(b,'es');
+  });
+
+  // Color del badge según subproceso
+  var colSub = {
+    'PRODUCCION':    '#27ae60',
+    'SERVICIOS':     '#0098d4',
+    'MATERIA PRIMA': '#e67e22',
+    'SIN ASIGNAR':   '#888'
+  };
+
+  subprocesos.forEach(function(sub){
+    var lineas = Object.keys(mapa[sub]).sort(function(a,b){
+      var oa = _ordenSubproceso[a] || 99, ob = _ordenSubproceso[b] || 99;
+      if(oa !== ob) return oa - ob;
+      return a.localeCompare(b,'es');
+    });
+
+    // Subtotal del subproceso por día
+    var subTotalDia = {};
+    dias.forEach(function(d){ subTotalDia[d.fecha] = 0; });
+    var subGranTotal = 0;
+    lineas.forEach(function(lin){
+      dias.forEach(function(d){
+        var v = mapa[sub][lin][d.fecha] || 0;
+        subTotalDia[d.fecha] += v;
+        subGranTotal += v;
+      });
+    });
+
+    var col = colSub[sub] || '#7f8c8d';
+
+    // Fila de cabecera del grupo (subtotal del subproceso)
+    filas += '<tr class="tr-subproceso" style="background:'+col+'22;font-weight:700">' +
+      '<td colspan="2" style="font-size:13px;color:'+col+';padding-left:14px">' +
+        '▸ ' + x(sub) + ' <span style="font-size:11px;opacity:.7;margin-left:6px">' + subGranTotal + ' regs</span>' +
+      '</td>' +
+      dias.map(function(d){
+        var v = subTotalDia[d.fecha];
+        return '<td class="td-num" style="font-weight:700;color:'+col+'">' + (v || '—') + '</td>';
+      }).join('') +
+    '</tr>';
+
+    // Filas detalle por línea
+    lineas.forEach(function(lin){
+      filas += '<tr>' +
+        '<td></td>' +
+        '<td style="padding-left:24px;font-weight:600">' + x(lin) + '</td>' +
+        dias.map(function(d){
+          var v = mapa[sub][lin][d.fecha] || 0;
+          return '<td class="td-num">' + (v || '—') + '</td>';
+        }).join('') +
+      '</tr>';
+    });
+  });
+
+  // Fila promedio diario
+  var diasConDatos = dias.filter(function(d){ return (totalDia[d.fecha]||0) > 0; }).length;
+  var promedio = diasConDatos > 0 ? Math.round(granTotal / diasConDatos) : 0;
+  filas += '<tr class="tr-gran-total">' +
+    '<td colspan="2" style="font-size:13px;letter-spacing:.3px">📊 Promedio diario &nbsp;<span style="font-size:17px;font-family:Calibri,sans-serif">≈ ' + promedio + ' <span style="font-size:11px;font-weight:500;opacity:.75">/ día (' + diasConDatos + ' día' + (diasConDatos!==1?'s':'') + ')</span></span></td>' +
+    dias.map(function(d){
+      return '<td class="td-num" style="font-size:15px;color:#fff">' + (totalDia[d.fecha] || '—') + '</td>';
+    }).join('') +
+  '</tr>';
+
+  tbody.innerHTML = filas || '<tr><td colspan="' + (dias.length + 2) + '"><div class="dash-loading">Sin datos para mostrar</div></td></tr>';
+  var turnoLabel = filtro ? ' · ' + (filtro==='día'?'☀ Día':filtro==='tarde'?'🌅 Tarde':'🌙 Noche') : '';
+  if(badge) badge.textContent = granTotal + ' registro' + (granTotal!==1?'s':'') + turnoLabel;
+}
+
 function renderTotalesCC(regs, dias, filtro){
   // Compatibilidad: si se llama sin args (onchange antiguo), tomar valores actuales
   if(!regs)  regs  = _dashRegs || [];
@@ -6526,6 +6736,193 @@ window.onload=function(){
   }
   // Si no hay sesión → login ya visible por defecto
 };
+
+// ════════════════════════════════════════════════════════════
+//  TABLA DINÁMICA — Producción por Especie/Producto
+// ════════════════════════════════════════════════════════════
+var _mapDashRegs = [];
+var _mapDashFiltroTurno = '';
+
+function mapDashPoblarFiltros() {
+  // Sacar valores únicos directamente de los registros (no de mapeo_procesos)
+  // así reflejamos lo realmente registrado en la semana
+  var fLin = document.getElementById('mapDashLinea').value;
+  var fFun = document.getElementById('mapDashFuncion').value;
+  var fEsp = document.getElementById('mapDashEspecie').value;
+
+  var setLin = new Set(), setFun = new Set(), setEsp = new Set(), setPro = new Set();
+
+  _mapDashRegs.forEach(function(r) {
+    var lin = String(r[4]||'').trim();
+    var fun = String(r[8]||'').trim();
+    var esp = String(r[10]||'').trim();
+    var pro = String(r[11]||'').trim();
+
+    if (lin) setLin.add(lin);
+    if (!fLin || lin === fLin) {
+      if (fun) setFun.add(fun);
+      if (!fFun || fun === fFun) {
+        if (esp) setEsp.add(esp);
+        if (!fEsp || esp === fEsp) {
+          if (pro) setPro.add(pro);
+        }
+      }
+    }
+  });
+
+  function poblar(id, vals, placeholder, sortLinea) {
+    var sel = document.getElementById(id);
+    var prev = sel.value;
+    var arr = [...vals];
+    if (sortLinea && typeof _cmpLinea === 'function') arr.sort(_cmpLinea);
+    else arr.sort();
+    sel.innerHTML = '<option value="">'+placeholder+'</option>';
+    arr.forEach(function(v) {
+      var o = document.createElement('option');
+      o.value = v; o.textContent = v;
+      sel.appendChild(o);
+    });
+    if (prev && arr.includes(prev)) sel.value = prev;
+  }
+
+  poblar('mapDashLinea', setLin, 'Todas líneas', true);
+  poblar('mapDashFuncion', setFun, 'Todas funciones');
+  poblar('mapDashEspecie', setEsp, 'Todas especies');
+  poblar('mapDashProducto', setPro, 'Todos productos');
+}
+
+function mapDashLimpiar() {
+  ['mapDashLinea','mapDashFuncion','mapDashEspecie','mapDashProducto'].forEach(function(id) {
+    document.getElementById(id).value = '';
+  });
+  mapDashFiltrar();
+}
+
+function mapDashFiltrar() {
+  var fLin = (document.getElementById('mapDashLinea').value || '').trim();
+  var fFun = (document.getElementById('mapDashFuncion').value || '').trim();
+  var fEsp = (document.getElementById('mapDashEspecie').value || '').trim();
+  var fPro = (document.getElementById('mapDashProducto').value || '').trim();
+  var group = document.getElementById('mapDashGroup').value;
+
+  // Filtrar registros por turno (igual que otras tablas) y por los 4 campos
+  var turno = _mapDashFiltroTurno;
+  var regs = _mapDashRegs.filter(function(r) {
+    if (turno && !String(r[3]||'').toLowerCase().includes(turno)) return false;
+    if (fLin && String(r[4]||'').trim() !== fLin) return false;
+    if (fFun && String(r[8]||'').trim() !== fFun) return false;
+    if (fEsp && String(r[10]||'').trim() !== fEsp) return false;
+    if (fPro && String(r[11]||'').trim() !== fPro) return false;
+    return true;
+  });
+
+  // Repoblar dropdowns con los valores disponibles ahora
+  mapDashPoblarFiltros();
+
+  renderMapDashTabla(regs, group);
+}
+
+function renderMapDashTabla(regs, group) {
+  var dias = _dashDias || [];
+  var thead = document.getElementById('theadMapeoDash');
+  var tbody = document.getElementById('tbodyMapeoDash');
+  var badge = document.getElementById('badgeMapeoDash');
+
+  // Determinar columnas de agrupación
+  var groupCols, headers;
+  if (group === 'especie_producto') { groupCols = [10, 11]; headers = ['Especie','Producto']; }
+  else if (group === 'linea_especie') { groupCols = [4, 10]; headers = ['Línea','Especie']; }
+  else if (group === 'funcion') { groupCols = [8]; headers = ['Función']; }
+  else if (group === 'linea_funcion') { groupCols = [4, 8]; headers = ['Línea','Función']; }
+  else { groupCols = [10, 11]; headers = ['Especie','Producto']; }
+
+  // Header
+  if (thead) {
+    thead.innerHTML = '<tr>' +
+      headers.map(function(h){ return '<th>'+h+'</th>'; }).join('') +
+      dias.map(function(d){ return '<th style="min-width:60px">'+d.label+'</th>'; }).join('') +
+    '</tr>';
+  }
+
+  // Deduplicar por empleado-fecha-turno (igual que renderTablaCombinada)
+  var yaContado = new Set();
+  var mapa = {};   // groupKey -> { fecha -> count }
+  var totalDia = {};
+  dias.forEach(function(d){ totalDia[d.fecha] = 0; });
+
+  regs.forEach(function(r) {
+    var fec = String(r[1]||'').substring(0,10);
+    if (totalDia[fec] === undefined) return;
+    var cod = String(r[5]||'').trim().toLowerCase();
+    var tur = String(r[3]||'').trim().toLowerCase();
+    if (cod) {
+      var k = cod+'|'+fec+'|'+tur;
+      if (yaContado.has(k)) return;
+      yaContado.add(k);
+    }
+    var groupKey = groupCols.map(function(c){ return String(r[c]||'').trim() || '—'; }).join('||');
+    if (!mapa[groupKey]) mapa[groupKey] = {};
+    mapa[groupKey][fec] = (mapa[groupKey][fec] || 0) + 1;
+    totalDia[fec]++;
+  });
+
+  var x = function(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');};
+  var granTotal = 0;
+  var filas = '';
+
+  // Ordenar las claves de grupo
+  var keys = Object.keys(mapa).sort(function(a,b) {
+    var pa = a.split('||'), pb = b.split('||');
+    // Si la primera columna es línea, usar comparador alfanumérico
+    if (groupCols[0] === 4 && typeof _cmpLinea === 'function') {
+      var r = _cmpLinea(pa[0], pb[0]);
+      if (r !== 0) return r;
+    } else {
+      var r = String(pa[0]).localeCompare(String(pb[0]),'es');
+      if (r !== 0) return r;
+    }
+    // Comparar segunda columna si existe
+    if (pa[1] && pb[1]) return String(pa[1]).localeCompare(String(pb[1]),'es');
+    return 0;
+  });
+
+  keys.forEach(function(key) {
+    var parts = key.split('||');
+    var cols = parts.map(function(p){ return '<td>'+x(p)+'</td>'; }).join('');
+    var dataCols = dias.map(function(d) {
+      var n = mapa[key][d.fecha] || 0;
+      granTotal += n;
+      return '<td class="td-num" style="color:var(--t-accent2,#0098d4);font-weight:600">'+(n>0?n:'—')+'</td>';
+    }).join('');
+    filas += '<tr>'+cols+dataCols+'</tr>';
+  });
+
+  if (!keys.length) {
+    var colSpan = headers.length + dias.length;
+    tbody.innerHTML = '<tr><td colspan="'+colSpan+'"><div class="dash-loading">Sin datos con los filtros actuales</div></td></tr>';
+    if (badge) badge.textContent = '0 registros';
+    return;
+  }
+
+  // Fila Promedio diario
+  var colsAvg = dias.map(function(d) {
+    return '<td class="td-num" style="font-size:15px;color:#fff">'+(totalDia[d.fecha]||'—')+'</td>';
+  }).join('');
+  var diasConDatos = dias.filter(function(d){ return (totalDia[d.fecha]||0) > 0; }).length;
+  var prom = diasConDatos > 0 ? Math.round(granTotal / diasConDatos) : 0;
+  var promLabel = diasConDatos > 0
+    ? '≈ '+prom+' <span style="font-size:11px;font-weight:500;opacity:.75">/ día ('+diasConDatos+' día'+(diasConDatos!==1?'s':'')+')</span>'
+    : '—';
+  var colspanLabel = headers.length;
+  filas += '<tr class="tr-gran-total">' +
+    '<td colspan="'+colspanLabel+'" style="font-size:13px;letter-spacing:.3px">' +
+      '📊 Promedio diario &nbsp;<span style="font-size:17px;font-family:Calibri,sans-serif">'+promLabel+'</span>' +
+    '</td>' + colsAvg + '</tr>';
+
+  tbody.innerHTML = filas;
+  if (badge) badge.textContent = granTotal + ' registro'+(granTotal!==1?'s':'');
+}
+
 </script>
 
 <!-- ══ LOGIN ══ -->
