@@ -4935,6 +4935,8 @@ function _turnoSegunHora(){
 }
 
 async function cargarDashboard(){
+  // Asegurar que el mapa de subprocesos esté cargado antes de renderizar
+  if (Object.keys(_mapaSubproceso).length === 0) { await cargarMapaSubproceso(); }
   // Autoseleccionar turno según hora si no hay selección previa
   const selDash = document.getElementById('filtroTurnoDash');
   if(selDash && !selDash.dataset.userSet) {
