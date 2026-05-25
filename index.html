@@ -2739,28 +2739,11 @@ body.noche-mode .modal-field input,body.noche-mode .modal-field select{color-sch
     </div>
   </div>
 
-  <!-- Registros agrupados por SubProceso (PRODUCCION, SERVICIOS, MATERIA PRIMA) -->
-  <div class="dash-card-full">
-    <div class="dash-card-header">
-      <span>🔀</span>
-      <h4>Registros por SubProceso · Línea · Día</h4>
-      <span class="dash-card-badge" id="badgeSubproc" style="background:var(--t-accent2,#0098d4)">0 registros</span>
-    </div>
-    <div class="combo-wrap">
-      <table class="combo-table" id="tablaSubproc">
-        <thead id="theadSubproc"></thead>
-        <tbody id="tbodySubproc">
-          <tr><td colspan="3"><div class="dash-loading">Calculando agrupación...</div></td></tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
-
   <!-- ── Tabla dinámica jerárquica: SubProceso → Línea → Función ── -->
   <div class="dash-card-full">
     <div class="dash-card-header">
       <span>📊</span>
-      <h4>Tabla Dinámica · SubProceso · Línea · Función — Semana</h4>
+      <h4>Tabla Dinámica · Categoría · Línea · Función — Semana</h4>
       <span class="dash-card-badge" id="badgePivot" style="background:var(--t-accent2,#0098d4)">—</span>
       <div style="display:flex;gap:6px;margin-left:auto">
         <button onclick="pivotExpandirTodo()" style="padding:5px 10px;border:1px solid var(--border);border-radius:6px;background:transparent;color:var(--text);font-size:11px;cursor:pointer" title="Expandir todos los niveles">⊞ Expandir todo</button>
@@ -5012,7 +4995,6 @@ function aplicarFiltroDash(){
   // KPIs — siempre con registros completos (sin filtrar) para mostrar los dos turnos
   renderKpis(_dashRegs, filtro);
   renderTablaCombinada(regs, _dashDias, filtro);
-  renderTablaSubproceso(regs, _dashDias, filtro);
   renderTotalesCC(regs, _dashDias, filtro);
   // Tabla dinámica jerárquica (SubProceso → Línea → Función)
   renderPivotTable(regs, _dashDias, filtro);
@@ -6740,6 +6722,23 @@ window.onload=function(){
 // ════════════════════════════════════════════════════════════
 //  TABLA DINÁMICA JERÁRQUICA — SubProceso → Línea → Función
 // ════════════════════════════════════════════════════════════
+
+// Clasificación por defecto cuando la línea no está en lineas_subproceso
+// Espeja la lógica de la tabla pivot de Excel de Friosur
+function _clasificarSubproceso(linea) {
+  var l = String(linea || '').trim().toUpperCase();
+  // SERVICIOS: la línea se llama exactamente SERVICIOS
+  if (l === 'SERVICIOS') return 'SERVICIOS';
+  // MATERIA PRIMA: línea MPRIMA
+  if (l === 'MPRIMA') return 'MATERIA PRIMA';
+  // PRODUCCION: líneas numéricas o conocidas de producción
+  var lineasProd = ['1','1B','2','3','EMPAQUE','SUBPRODUCTO','S/L'];
+  if (lineasProd.indexOf(l) !== -1) return 'PRODUCCION';
+  // Para cualquier otra línea sin mapeo explícito, asumir PRODUCCION
+  // si parece numérica, sino SIN ASIGNAR
+  if (/^\d/.test(l)) return 'PRODUCCION';
+  return 'SIN ASIGNAR';
+}
 var _pivotData = null;    // estructura jerárquica calculada
 var _pivotExpand = {};    // estado de expansión {key: true/false}
 var _pivotDias = [];
@@ -6776,7 +6775,7 @@ function renderPivotTable(regs, dias, filtro) {
 
   // Header
   thead.innerHTML = '<tr>' +
-    '<th class="th-left" style="min-width:280px">SubProceso · Línea · Función</th>' +
+    '<th class="th-left" style="min-width:280px">Categoría · Línea · Función</th>' +
     dias.map(function(d){ return '<th style="min-width:60px">'+d.label+'</th>'; }).join('') +
     '<th style="min-width:70px;background:rgba(0,152,212,.1)">Total</th>' +
   '</tr>';
@@ -6807,7 +6806,7 @@ function renderPivotTable(regs, dias, filtro) {
     }
 
     // Buscar subproceso de la línea
-    var sub = (_mapaSubproceso[lin.toUpperCase()] || 'SIN ASIGNAR').toUpperCase();
+    var sub = (_mapaSubproceso[lin.toUpperCase()] || _clasificarSubproceso(lin)).toUpperCase();
 
     // Nivel 1: SubProceso
     if (!data.l1[sub]) data.l1[sub] = { totals: {}, l2: {}, granTotal: 0 };
