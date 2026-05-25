@@ -2743,7 +2743,7 @@ body.noche-mode .modal-field input,body.noche-mode .modal-field select{color-sch
   <div class="dash-card-full">
     <div class="dash-card-header">
       <span>📊</span>
-      <h4>Tabla Dinámica · Categoría · Línea · Función — Semana</h4>
+      <h4>Área de Producción — Semana</h4>
       <span class="dash-card-badge" id="badgePivot" style="background:var(--t-accent2,#0098d4)">—</span>
       <div style="display:flex;gap:6px;margin-left:auto">
         <button onclick="pivotExpandirTodo()" style="padding:5px 10px;border:1px solid var(--border);border-radius:6px;background:transparent;color:var(--text);font-size:11px;cursor:pointer" title="Expandir todos los niveles">⊞ Expandir todo</button>
@@ -6915,14 +6915,26 @@ function renderPivotBody() {
     });
   });
 
-  // Fila Total general
+  // Fila Total general — recalcular sumando desde l1 para garantizar coherencia
+  var _totByDay = {};
+  dias.forEach(function(d){ _totByDay[d.fecha] = 0; });
+  var _gt = 0;
+  Object.keys(_pivotData.l1).forEach(function(sub) {
+    var nodo = _pivotData.l1[sub];
+    dias.forEach(function(d) {
+      var v = nodo.totals[d.fecha] || 0;
+      _totByDay[d.fecha] += v;
+    });
+    _gt += nodo.granTotal || 0;
+  });
   var colsTotal = dias.map(function(d) {
-    return '<td class="pivot-num">'+(_pivotData.totals[d.fecha]||'—')+'</td>';
+    var v = _totByDay[d.fecha];
+    return '<td class="pivot-num" style="color:#fff;font-size:14px">'+(v||'—')+'</td>';
   }).join('');
   filas += '<tr class="pivot-total">' +
-    '<td>📊 Total general</td>' +
+    '<td style="font-size:13px;font-weight:700">📊 Total general</td>' +
     colsTotal +
-    '<td class="pivot-num">'+_pivotData.granTotal+'</td>' +
+    '<td class="pivot-num" style="color:#fff;font-size:14px">'+(_gt||'—')+'</td>' +
   '</tr>';
 
   tbody.innerHTML = filas || '<tr><td colspan="'+(dias.length+2)+'"><div class="dash-loading">Sin datos</div></td></tr>';
