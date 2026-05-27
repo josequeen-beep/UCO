@@ -1359,6 +1359,26 @@ body.noche-mode .programado-row{background:rgba(56,182,255,.04);border-color:rgb
   animation:slideDown .2s ease
 }
 @keyframes slideDown{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
+/* ── Modal BEM ── */
+#bemModal{
+  display:none;position:fixed;inset:0;z-index:9999;
+  background:rgba(0,0,0,.65);backdrop-filter:blur(3px);
+  align-items:center;justify-content:center
+}
+#bemModalBox{
+  background:linear-gradient(160deg,#0d2137,#1a3a5c);
+  border:1px solid #0098d4;border-radius:12px;
+  padding:24px;min-width:360px;max-width:520px;width:90%;
+  box-shadow:0 8px 32px rgba(0,152,212,.3);
+  animation:slideDown .2s ease
+}
+#bemModalBox h4{color:#0098d4;font-size:14px;margin:0 0 14px;letter-spacing:.5px}
+.bem-modal-btns{display:flex;gap:8px;justify-content:flex-end;margin-top:16px}
+.bem-modal-btns button{border:none;border-radius:7px;padding:8px 18px;font-size:13px;font-weight:700;cursor:pointer}
+.bem-btn-confirm{background:#0098d4;color:#fff}
+.bem-btn-confirm:hover{background:#00b8f0}
+.bem-btn-cancel{background:#1e4060;color:#8ab}
+.bem-btn-cancel:hover{background:#234a74;color:#fff}
 #barEdicMasiva .bem-title{color:#0098d4;font-size:11px;font-weight:700;letter-spacing:.5px;margin-bottom:6px;display:flex;align-items:center;gap:6px}
 #barEdicMasiva .bem-row{display:flex;flex-wrap:wrap;gap:6px;align-items:flex-end}
 #barEdicMasiva .bem-field{display:flex;flex-direction:column;gap:2px}
@@ -6343,27 +6363,116 @@ function bemSelLinea(){
 function bemSelTodos(){document.querySelectorAll('.chk-reg').forEach(function(c){c.checked=true;});actualizarSelReg();}
 function bemDeselTodos(){document.querySelectorAll('.chk-reg').forEach(function(c){c.checked=false;});actualizarSelReg();}
 
-async function bemAplicar(){
+// Abre modal de confirmación con preview de los cambios
+function bemAplicar(){
   var ids=Array.from(document.querySelectorAll('.chk-reg:checked')).map(function(c){return c.value;});
   if(!ids.length){showToast('Selecciona al menos una fila','warning');return;}
-  var patch={};
-  var m={'especie':'bemEspecie','producto':'bemProducto','funcion':'bemFuncion'};
-  Object.keys(m).forEach(function(k){var v=(document.getElementById(m[k]).value||'').trim();if(v)patch[k]=v;});
-  var pr=(document.getElementById('bemProceso').value||'').trim();if(pr)patch.proceso=pr;
-  var oo=(document.getElementById('bemOperacion').value||'').trim();if(oo)patch.operacion=oo;
-  var hi=(document.getElementById('bemHoraInicio').value||'').trim();if(hi)patch.hora_inicio=hi;
-  var hc=(document.getElementById('bemHoraCorte').value||'').trim();if(hc)patch.hora_corte=hc;
-  if(!Object.keys(patch).length){showToast('No hay campos para modificar','warning');return;}
-  if(!confirm('\u00bfAplicar cambios en '+ids.length+' registro'+(ids.length!==1?'s':'')+' ?\n\nCampos: '+Object.keys(patch).join(', ')))return;
-  showToast('\u23f3 Aplicando cambios\u2026','info',4000);
-  var CHUNK=50,ok=0,errCount=0;
-  for(var i=0;i<ids.length;i+=CHUNK){
-    var lote=ids.slice(i,i+CHUNK);
-    try{var res=await supabase.from('asistencia').update(patch).in('id',lote);if(res.error)errCount+=lote.length;else ok+=lote.length;}catch(e){errCount+=lote.length;}
+
+  var cambios={};
+  var especie  =(document.getElementById('bemEspecie').value||'').trim();
+  var producto =(document.getElementById('bemProducto').value||'').trim();
+  var funcion  =(document.getElementById('bemFuncion').value||'').trim();
+  var proceso  =(document.getElementById('bemProceso').value||'').trim();
+  var operacion=(document.getElementById('bemOperacion').value||'').trim();
+  var hi       =(document.getElementById('bemHoraInicio').value||'').trim();
+  var hc       =(document.getElementById('bemHoraCorte').value||'').trim();
+  if(especie)   cambios.especie=especie;
+  if(producto)  cambios.producto=producto;
+  if(funcion)   cambios.funcion=funcion;
+  if(proceso)   cambios.proceso=proceso;
+  if(operacion) cambios.operacion=operacion;
+  if(hi)        cambios.proceso_inicio=hi;
+  if(hc)        cambios.proceso_termino=hc;
+
+  if(!Object.keys(cambios).length){showToast('Define al menos un campo para copiar','warning');return;}
+
+  // Obtener filas seleccionadas desde todosRegistros
+  var idSet=new Set(ids);
+  var filas=(typeof todosRegistros!=='undefined'?todosRegistros:[]).filter(function(r){
+    // buscar por id — todosRegistros incluye id en index 24 o buscar en DOM
+    var fila=document.getElementById('regfila-'+ids[0]);
+    return true; // filtrar abajo
+  });
+  // Obtener id real de cada fila desde el DOM
+  var idxMap={};
+  ids.forEach(function(id){
+    var chk=document.querySelector('.chk-reg[value="'+id+'"]');
+    if(chk) idxMap[id]=parseInt(chk.dataset.idx);
+  });
+
+  // Construir preview
+  var labels={'especie':'Especie','producto':'Producto','funcion':'Función','proceso':'Proceso','operacion':'Operación','proceso_inicio':'Hora Inicio','proceso_termino':'Hora Corte'};
+  var preview=Object.keys(cambios).map(function(k){
+    return '<div style="display:flex;gap:8px;align-items:center;padding:4px 0;border-bottom:1px solid #1e4060">'
+      +'<span style="color:#8ab;font-size:11px;width:100px;flex-shrink:0">'+labels[k]+'</span>'
+      +'<span style="color:#0098d4;font-weight:700">'+escTxt(cambios[k])+'</span></div>';
+  }).join('');
+
+  var modal=document.getElementById('bemModal');
+  var modalBody=document.getElementById('bemModalBody');
+  if(modalBody){
+    modalBody.innerHTML=
+      '<div style="color:#e0f0ff;margin-bottom:12px">Se crearán <strong style="color:#0098d4">'+ids.length+' cop'+(ids.length!==1?'ias':'ia')+'</strong> con los siguientes valores:</div>'
+      +'<div style="margin-bottom:12px">'+preview+'</div>'
+      +'<div style="color:#8ab;font-size:11px">El centro de costo y demás campos se mantienen del registro original.</div>';
   }
-  if(errCount)showToast('\u26a0\ufe0f '+ok+' OK \xb7 '+errCount+' errores','warning',5000);
-  else showToast('\u2705 '+ok+' registros actualizados','success');
-  bemDeselTodos();_registrosCargados=false;cargarRegistros();
+  window._bemPending={ids:ids,idxMap:idxMap,cambios:cambios};
+  if(modal) modal.style.display='flex';
+}
+
+async function bemConfirmar(){
+  var modal=document.getElementById('bemModal');
+  if(modal) modal.style.display='none';
+  var p=window._bemPending||{};
+  var ids=p.ids||[], idxMap=p.idxMap||{}, cambios=p.cambios||{};
+  if(!ids.length) return;
+
+  showToast('⏳ Creando copias…','info',4000);
+  var ok=0, errCount=0;
+
+  for(var i=0;i<ids.length;i++){
+    var id=ids[i];
+    var idx=idxMap[id];
+    var r=(typeof todosRegistros!=='undefined'&&idx!==undefined)?todosRegistros[idx]:null;
+    if(!r){ errCount++; continue; }
+
+    var nuevo={
+      mes:r[0], fecha:r[1], responsable:r[2], turno:r[3], linea:r[4],
+      codigo:r[5], nombre:r[6], tipo_contrato:r[7],
+      funcion:    cambios.funcion    || r[8]  || '',
+      centro_costo:               r[9]  || '',
+      especie:    cambios.especie   || r[10] || '',
+      producto:   cambios.producto  || r[11] || '',
+      proceso:    cambios.proceso   || r[12] || '',
+      operacion:  cambios.operacion || r[13] || '',
+      proceso_inicio:  cambios.proceso_inicio  || r[14] || null,
+      proceso_termino: cambios.proceso_termino || r[15] || null,
+      atraso_inicio:   r[16]||'0',
+      descanso_inicio: r[17]||null,
+      descanso_termino:r[18]||null,
+      desayuno_programado:r[19]||'',
+      colacion_inicio: r[20]||null,
+      colacion_termino:r[21]||null,
+      colacion_programado:r[22]||''
+    };
+
+    try{
+      var res=await _sbDb().from('registros').insert(nuevo);
+      if(res.error){ console.error(res.error); errCount++; } else ok++;
+    }catch(e){ console.error(e); errCount++; }
+  }
+
+  if(errCount) showToast('⚠️ '+ok+' copiados · '+errCount+' errores','warning',5000);
+  else showToast('✅ '+ok+' registros copiados correctamente','success');
+  bemDeselTodos();
+  _registrosCargados=false;
+  cargarRegistros();
+}
+
+function bemCancelar(){
+  var modal=document.getElementById('bemModal');
+  if(modal) modal.style.display='none';
+  window._bemPending=null;
 }
 
 function actualizarSelReg(){
@@ -7143,6 +7252,18 @@ function renderPivotBody() {
     </div>
     <button class="lbtn" id="li-btn" onclick="loginIndex()">Ingresar</button>
     <div class="lerror" id="li-error"></div>
+  </div>
+</div>
+
+<!-- ── Modal confirmación Edición Masiva ── -->
+<div id="bemModal">
+  <div id="bemModalBox">
+    <h4>✏️ CONFIRMAR COPIA DE REGISTROS</h4>
+    <div id="bemModalBody"></div>
+    <div class="bem-modal-btns">
+      <button class="bem-btn-cancel" onclick="bemCancelar()">✕ Cancelar</button>
+      <button class="bem-btn-confirm" onclick="bemConfirmar()">⚡ Confirmar y copiar</button>
+    </div>
   </div>
 </div>
 
