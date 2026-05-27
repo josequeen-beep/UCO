@@ -2634,10 +2634,8 @@ body.noche-mode .modal-field input,body.noche-mode .modal-field select{color-sch
     </div>
   </div>
 
-  <!-- Tabla -->
-  <div class="table-wrap">
-    <!-- ── Panel Edición Masiva (aparece al seleccionar filas) ── -->
-    <div id="barEdicMasiva">
+  <!-- ── Panel Edición Masiva ── -->
+  <div id="barEdicMasiva">
       <div class="bem-title">
         ✏️ EDICIÓN MASIVA —
         <span class="bem-cnt" id="bemCnt">0</span> filas seleccionadas
@@ -2697,7 +2695,10 @@ body.noche-mode .modal-field input,body.noche-mode .modal-field select{color-sch
           <button class="bem-btn-apply" onclick="bemAplicar()">⚡ Aplicar cambios</button>
         </div>
       </div>
-    </div>
+  </div>
+
+  <!-- Tabla -->
+  <div class="table-wrap">
     <table id="tablaReg">
       <thead><tr>
         <th class="no-sort" style="width:36px;text-align:center;padding:6px"></th>
@@ -6375,7 +6376,7 @@ function actualizarSelReg(){
   // Panel edición masiva
   var panelBEM = document.getElementById('barEdicMasiva');
   var bemCnt   = document.getElementById('bemCnt');
-  if(panelBEM) panelBEM.style.display = marcados.length > 0 ? '' : 'none';
+  if(panelBEM) panelBEM.style.display = marcados.length > 0 ? 'block' : 'none';
   if(bemCnt)   bemCnt.textContent = marcados.length;
   if(marcados.length === 1 || (marcados.length > 0 && document.getElementById('bemCombo') && document.getElementById('bemCombo').options.length <= 1)){
     bemCargarOpciones();
