@@ -1351,10 +1351,10 @@ body.noche-mode .programado-row{background:rgba(56,182,255,.04);border-color:rgb
 
 /* ── Panel Edición Masiva ── */
 #barEdicMasiva{
-  display:none;position:sticky;top:0;z-index:90;
+  display:none;z-index:90;
   background:linear-gradient(135deg,#0d2137,#1a3a5c);
   border:1px solid #0098d4;border-radius:8px;
-  padding:8px 12px;margin:6px 0;
+  padding:8px 12px;margin:0 0 6px 0;
   box-shadow:0 3px 12px rgba(0,152,212,.25);
   animation:slideDown .2s ease
 }
@@ -2634,75 +2634,70 @@ body.noche-mode .modal-field input,body.noche-mode .modal-field select{color-sch
     </div>
   </div>
 
-  <!-- ── Panel Edición Masiva (aparece al seleccionar filas) ── -->
-  <div id="barEdicMasiva">
-    <div class="bem-title">
-      ✏️ EDICIÓN MASIVA —
-      <span class="bem-cnt" id="bemCnt">0</span> filas seleccionadas
-      <span style="margin-left:auto;font-size:10px;color:#567;font-weight:400">Los campos vacíos no se modifican</span>
-    </div>
-    <div class="bem-row">
-      <!-- Selector rápido -->
-      <div class="bem-field">
-        <label>SELECCIONAR</label>
-        <div style="display:flex;gap:4px">
-          <button class="bem-btn-sel" onclick="bemSelLinea()">Por línea</button>
-          <button class="bem-btn-sel" onclick="bemSelTodos()">Todos</button>
-          <button class="bem-btn-sel" onclick="bemDeselTodos()">✕ Ninguno</button>
-        </div>
-      </div>
-      <div class="bem-sep"></div>
-      <!-- Combinación de proceso (busca combinaciones existentes) -->
-      <div class="bem-field" style="min-width:220px">
-        <label>COMBINACIÓN PROCESO</label>
-        <select id="bemCombo" onchange="bemAutoFill()">
-          <option value="">— Seleccionar combinación —</option>
-        </select>
-      </div>
-      <div class="bem-sep"></div>
-      <!-- Campos individuales sobreescribibles -->
-      <div class="bem-field">
-        <label>ESPECIE</label>
-        <select id="bemEspecie"><option value="">Sin cambio</option></select>
-      </div>
-      <div class="bem-field">
-        <label>PRODUCTO</label>
-        <select id="bemProducto"><option value="">Sin cambio</option></select>
-      </div>
-      <div class="bem-field">
-        <label>FUNCIÓN</label>
-        <select id="bemFuncion"><option value="">Sin cambio</option></select>
-      </div>
-      <div class="bem-field">
-        <label>PROCESO</label>
-        <input type="text" id="bemProceso" placeholder="Sin cambio" list="bemProcesoList">
-        <datalist id="bemProcesoList"></datalist>
-      </div>
-      <div class="bem-field">
-        <label>OPERACIÓN</label>
-        <input type="text" id="bemOperacion" placeholder="Sin cambio" list="bemOperList">
-        <datalist id="bemOperList"></datalist>
-      </div>
-      <div class="bem-sep"></div>
-      <!-- Horas -->
-      <div class="bem-field">
-        <label>HORA INICIO</label>
-        <input type="time" id="bemHoraInicio" style="min-width:90px">
-      </div>
-      <div class="bem-field">
-        <label>HORA CORTE</label>
-        <input type="time" id="bemHoraCorte" style="min-width:90px">
-      </div>
-      <div class="bem-sep"></div>
-      <div class="bem-field" style="justify-content:flex-end">
-        <label style="visibility:hidden">-</label>
-        <button class="bem-btn-apply" onclick="bemAplicar()">⚡ Aplicar cambios</button>
-      </div>
-    </div>
-  </div>
-
   <!-- Tabla -->
   <div class="table-wrap">
+    <!-- ── Panel Edición Masiva (aparece al seleccionar filas) ── -->
+    <div id="barEdicMasiva">
+      <div class="bem-title">
+        ✏️ EDICIÓN MASIVA —
+        <span class="bem-cnt" id="bemCnt">0</span> filas seleccionadas
+        <span style="margin-left:auto;font-size:10px;color:#567;font-weight:400">Los campos vacíos no se modifican</span>
+      </div>
+      <div class="bem-row">
+        <div class="bem-field">
+          <label>SELECCIONAR</label>
+          <div style="display:flex;gap:4px">
+            <button class="bem-btn-sel" onclick="bemSelLinea()">Por línea</button>
+            <button class="bem-btn-sel" onclick="bemSelTodos()">Todos</button>
+            <button class="bem-btn-sel" onclick="bemDeselTodos()">✕ Ninguno</button>
+          </div>
+        </div>
+        <div class="bem-sep"></div>
+        <div class="bem-field" style="min-width:220px">
+          <label>COMBINACIÓN PROCESO</label>
+          <select id="bemCombo" onchange="bemAutoFill()">
+            <option value="">— Seleccionar combinación —</option>
+          </select>
+        </div>
+        <div class="bem-sep"></div>
+        <div class="bem-field">
+          <label>ESPECIE</label>
+          <select id="bemEspecie"><option value="">Sin cambio</option></select>
+        </div>
+        <div class="bem-field">
+          <label>PRODUCTO</label>
+          <select id="bemProducto"><option value="">Sin cambio</option></select>
+        </div>
+        <div class="bem-field">
+          <label>FUNCIÓN</label>
+          <select id="bemFuncion"><option value="">Sin cambio</option></select>
+        </div>
+        <div class="bem-field">
+          <label>PROCESO</label>
+          <input type="text" id="bemProceso" placeholder="Sin cambio" list="bemProcesoList">
+          <datalist id="bemProcesoList"></datalist>
+        </div>
+        <div class="bem-field">
+          <label>OPERACIÓN</label>
+          <input type="text" id="bemOperacion" placeholder="Sin cambio" list="bemOperList">
+          <datalist id="bemOperList"></datalist>
+        </div>
+        <div class="bem-sep"></div>
+        <div class="bem-field">
+          <label>HORA INICIO</label>
+          <input type="time" id="bemHoraInicio" style="min-width:90px">
+        </div>
+        <div class="bem-field">
+          <label>HORA CORTE</label>
+          <input type="time" id="bemHoraCorte" style="min-width:90px">
+        </div>
+        <div class="bem-sep"></div>
+        <div class="bem-field" style="justify-content:flex-end">
+          <label style="visibility:hidden">-</label>
+          <button class="bem-btn-apply" onclick="bemAplicar()">⚡ Aplicar cambios</button>
+        </div>
+      </div>
+    </div>
     <table id="tablaReg">
       <thead><tr>
         <th class="no-sort" style="width:36px;text-align:center;padding:6px"></th>
