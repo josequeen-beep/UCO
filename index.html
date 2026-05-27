@@ -6376,11 +6376,9 @@ function actualizarSelReg(){
   // Panel edición masiva
   var panelBEM = document.getElementById('barEdicMasiva');
   var bemCnt   = document.getElementById('bemCnt');
-  if(panelBEM) panelBEM.style.display = marcados.length > 0 ? 'block' : 'none';
+  if(panelBEM) { panelBEM.style.display = marcados.length > 0 ? 'block' : 'none'; }
   if(bemCnt)   bemCnt.textContent = marcados.length;
-  if(marcados.length === 1 || (marcados.length > 0 && document.getElementById('bemCombo') && document.getElementById('bemCombo').options.length <= 1)){
-    bemCargarOpciones();
-  }
+  if(marcados.length > 0) { bemCargarOpciones(); }
   // Resaltar filas seleccionadas
   checks.forEach(function(c){
     var fila = document.getElementById('regfila-' + c.value);
