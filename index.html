@@ -1348,6 +1348,43 @@ body.noche-mode .hint-noche{display:inline}
 body.noche-mode .programado-row{background:rgba(56,182,255,.04);border-color:rgba(56,182,255,.2)}
 .programado-row label{font-size:13px;font-weight:600;color:var(--text);cursor:pointer}
 .programado-row input[type=checkbox]{width:17px;height:17px;cursor:pointer;accent-color:var(--accent2);flex-shrink:0}
+
+/* ── Panel Edición Masiva ── */
+#barEdicMasiva{
+  display:none;position:sticky;top:0;z-index:90;
+  background:linear-gradient(135deg,#0d2137,#1a3a5c);
+  border:1px solid #0098d4;border-radius:8px;
+  padding:8px 12px;margin:6px 0;
+  box-shadow:0 3px 12px rgba(0,152,212,.25);
+  animation:slideDown .2s ease
+}
+@keyframes slideDown{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
+#barEdicMasiva .bem-title{color:#0098d4;font-size:11px;font-weight:700;letter-spacing:.5px;margin-bottom:6px;display:flex;align-items:center;gap:6px}
+#barEdicMasiva .bem-row{display:flex;flex-wrap:wrap;gap:6px;align-items:flex-end}
+#barEdicMasiva .bem-field{display:flex;flex-direction:column;gap:2px}
+#barEdicMasiva .bem-field label{font-size:10px;color:#8ab;font-weight:600;letter-spacing:.3px}
+#barEdicMasiva .bem-field select,#barEdicMasiva .bem-field input{
+  background:#0a1e2e;color:#e0f0ff;border:1px solid #1e4060;
+  border-radius:5px;padding:4px 7px;font-size:12px;min-width:120px;
+  cursor:pointer
+}
+#barEdicMasiva .bem-field select:focus,#barEdicMasiva .bem-field input:focus{outline:none;border-color:#0098d4}
+#barEdicMasiva .bem-sep{width:1px;background:#1e4060;align-self:stretch;margin:0 2px}
+#barEdicMasiva .bem-btn-apply{
+  background:#0098d4;color:#fff;border:none;border-radius:6px;
+  padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer;
+  transition:background .15s;white-space:nowrap
+}
+#barEdicMasiva .bem-btn-apply:hover{background:#00b8f0}
+#barEdicMasiva .bem-btn-sel{
+  background:transparent;color:#8ab;border:1px solid #1e4060;
+  border-radius:5px;padding:4px 9px;font-size:11px;cursor:pointer;white-space:nowrap
+}
+#barEdicMasiva .bem-btn-sel:hover{border-color:#0098d4;color:#0098d4}
+#barEdicMasiva .bem-cnt{
+  background:#e05252;color:#fff;border-radius:10px;
+  padding:1px 7px;font-size:11px;font-weight:700
+}
 .prog-hint{margin-left:auto;font-size:11px;color:var(--muted);background:var(--light);
   padding:2px 9px;border-radius:20px;white-space:nowrap;transition:all .6s}
 
@@ -2594,6 +2631,73 @@ body.noche-mode .modal-field input,body.noche-mode .modal-field select{color-sch
           placeholder="Nombre, código, especie..." oninput="aplicarFiltros()">
       </div>
       <button class="btn-clear-filtros" onclick="limpiarFiltros()">✕ Limpiar</button>
+    </div>
+  </div>
+
+  <!-- ── Panel Edición Masiva (aparece al seleccionar filas) ── -->
+  <div id="barEdicMasiva">
+    <div class="bem-title">
+      ✏️ EDICIÓN MASIVA —
+      <span class="bem-cnt" id="bemCnt">0</span> filas seleccionadas
+      <span style="margin-left:auto;font-size:10px;color:#567;font-weight:400">Los campos vacíos no se modifican</span>
+    </div>
+    <div class="bem-row">
+      <!-- Selector rápido -->
+      <div class="bem-field">
+        <label>SELECCIONAR</label>
+        <div style="display:flex;gap:4px">
+          <button class="bem-btn-sel" onclick="bemSelLinea()">Por línea</button>
+          <button class="bem-btn-sel" onclick="bemSelTodos()">Todos</button>
+          <button class="bem-btn-sel" onclick="bemDeselTodos()">✕ Ninguno</button>
+        </div>
+      </div>
+      <div class="bem-sep"></div>
+      <!-- Combinación de proceso (busca combinaciones existentes) -->
+      <div class="bem-field" style="min-width:220px">
+        <label>COMBINACIÓN PROCESO</label>
+        <select id="bemCombo" onchange="bemAutoFill()">
+          <option value="">— Seleccionar combinación —</option>
+        </select>
+      </div>
+      <div class="bem-sep"></div>
+      <!-- Campos individuales sobreescribibles -->
+      <div class="bem-field">
+        <label>ESPECIE</label>
+        <select id="bemEspecie"><option value="">Sin cambio</option></select>
+      </div>
+      <div class="bem-field">
+        <label>PRODUCTO</label>
+        <select id="bemProducto"><option value="">Sin cambio</option></select>
+      </div>
+      <div class="bem-field">
+        <label>FUNCIÓN</label>
+        <select id="bemFuncion"><option value="">Sin cambio</option></select>
+      </div>
+      <div class="bem-field">
+        <label>PROCESO</label>
+        <input type="text" id="bemProceso" placeholder="Sin cambio" list="bemProcesoList">
+        <datalist id="bemProcesoList"></datalist>
+      </div>
+      <div class="bem-field">
+        <label>OPERACIÓN</label>
+        <input type="text" id="bemOperacion" placeholder="Sin cambio" list="bemOperList">
+        <datalist id="bemOperList"></datalist>
+      </div>
+      <div class="bem-sep"></div>
+      <!-- Horas -->
+      <div class="bem-field">
+        <label>HORA INICIO</label>
+        <input type="time" id="bemHoraInicio" style="min-width:90px">
+      </div>
+      <div class="bem-field">
+        <label>HORA CORTE</label>
+        <input type="time" id="bemHoraCorte" style="min-width:90px">
+      </div>
+      <div class="bem-sep"></div>
+      <div class="bem-field" style="justify-content:flex-end">
+        <label style="visibility:hidden">-</label>
+        <button class="bem-btn-apply" onclick="bemAplicar()">⚡ Aplicar cambios</button>
+      </div>
     </div>
   </div>
 
@@ -4283,6 +4387,7 @@ function _aplicarFiltrosServidor(pagina){
     // Restaurar selección si la línea filtrada sigue presente
     if(filtros.linea) document.getElementById('filtroLinea').value = filtros.linea;
     renderTabla(todosRegistros);
+    bemCargarOpciones();
     _actualizarPaginadorServidor(res.data, filtros, pagina);
   }).catch(e=>{
     tbody.innerHTML='<tr><td colspan="26"><div class="empty-state"><div class="ei">⚠️</div><p>'+escTxt(e.message||e)+'</p></div></td></tr>';
@@ -6193,6 +6298,78 @@ window.addEventListener('online', ()=>{
 // ════════════════════════════════════════════════════
 //  SELECCIÓN MÚLTIPLE — Registros
 // ════════════════════════════════════════════════════
+// ════════════════════════════════════════════════════════════
+//  EDICIÓN MASIVA — Panel BEM
+// ════════════════════════════════════════════════════════════
+
+function bemCargarOpciones() {
+  var rows = (typeof todosRegistros !== 'undefined' && todosRegistros.length) ? todosRegistros : (window._filteredRows || window._allRows || []);
+  var especies=new Set(),productos=new Set(),funciones=new Set(),procesos=new Set(),operaciones=new Set();
+  var combos=new Map();
+  rows.forEach(function(r){
+    var e=r[9]||'',p=r[10]||'',f=r[8]||'',pr=r[11]||'',op=r[12]||'';
+    if(e)especies.add(e); if(p)productos.add(p); if(f)funciones.add(f);
+    if(pr)procesos.add(pr); if(op)operaciones.add(op);
+    if(e||p||f||pr||op){var k=[e,p,f,pr,op].join('|');if(!combos.has(k))combos.set(k,{especie:e,producto:p,funcion:f,proceso:pr,operacion:op});}
+  });
+  var sc=document.getElementById('bemCombo');
+  if(sc){
+    sc.innerHTML='<option value="">— Seleccionar combinación —</option>';
+    Array.from(combos.values()).sort(function(a,b){return(a.especie+a.producto).localeCompare(b.especie+b.producto,'es');}).forEach(function(c,i){
+      var parts=[c.especie,c.producto,c.funcion,c.proceso,c.operacion].filter(Boolean);
+      var opt=document.createElement('option');opt.value=i;opt.textContent=parts.join(' · ');
+      opt.dataset.especie=c.especie;opt.dataset.producto=c.producto;opt.dataset.funcion=c.funcion;opt.dataset.proceso=c.proceso;opt.dataset.operacion=c.operacion;
+      sc.appendChild(opt);
+    });
+  }
+  function fs2(id,set){var s=document.getElementById(id);if(!s)return;s.innerHTML='<option value="">Sin cambio</option>';Array.from(set).sort().forEach(function(v){var o=document.createElement('option');o.value=v;o.textContent=v;s.appendChild(o);});}
+  fs2('bemEspecie',especies);fs2('bemProducto',productos);fs2('bemFuncion',funciones);
+  function fdl(id,set){var d=document.getElementById(id);if(!d)return;d.innerHTML='';Array.from(set).sort().forEach(function(v){var o=document.createElement('option');o.value=v;d.appendChild(o);});}
+  fdl('bemProcesoList',procesos);fdl('bemOperList',operaciones);
+}
+
+function bemAutoFill(){
+  var sc=document.getElementById('bemCombo');if(!sc||!sc.selectedOptions[0])return;
+  var opt=sc.selectedOptions[0];if(!opt.dataset.especie&&!opt.dataset.producto)return;
+  ['Especie','Producto','Funcion'].forEach(function(k){var el=document.getElementById('bem'+k);if(el&&opt.dataset[k.toLowerCase()])el.value=opt.dataset[k.toLowerCase()];});
+  var pr=document.getElementById('bemProceso');if(pr&&opt.dataset.proceso)pr.value=opt.dataset.proceso;
+  var oo=document.getElementById('bemOperacion');if(oo&&opt.dataset.operacion)oo.value=opt.dataset.operacion;
+}
+
+function bemSelLinea(){
+  var lin=prompt('Ingresa el número de línea (ej: 2):','');if(!lin)return;
+  document.querySelectorAll('.chk-reg').forEach(function(c){
+    var fila=document.getElementById('regfila-'+c.value);if(!fila)return;
+    c.checked=Array.from(fila.querySelectorAll('td')).some(function(td){return td.textContent.trim()===lin.trim();});
+  });
+  actualizarSelReg();
+}
+function bemSelTodos(){document.querySelectorAll('.chk-reg').forEach(function(c){c.checked=true;});actualizarSelReg();}
+function bemDeselTodos(){document.querySelectorAll('.chk-reg').forEach(function(c){c.checked=false;});actualizarSelReg();}
+
+async function bemAplicar(){
+  var ids=Array.from(document.querySelectorAll('.chk-reg:checked')).map(function(c){return c.value;});
+  if(!ids.length){showToast('Selecciona al menos una fila','warning');return;}
+  var patch={};
+  var m={'especie':'bemEspecie','producto':'bemProducto','funcion':'bemFuncion'};
+  Object.keys(m).forEach(function(k){var v=(document.getElementById(m[k]).value||'').trim();if(v)patch[k]=v;});
+  var pr=(document.getElementById('bemProceso').value||'').trim();if(pr)patch.proceso=pr;
+  var oo=(document.getElementById('bemOperacion').value||'').trim();if(oo)patch.operacion=oo;
+  var hi=(document.getElementById('bemHoraInicio').value||'').trim();if(hi)patch.hora_inicio=hi;
+  var hc=(document.getElementById('bemHoraCorte').value||'').trim();if(hc)patch.hora_corte=hc;
+  if(!Object.keys(patch).length){showToast('No hay campos para modificar','warning');return;}
+  if(!confirm('\u00bfAplicar cambios en '+ids.length+' registro'+(ids.length!==1?'s':'')+' ?\n\nCampos: '+Object.keys(patch).join(', ')))return;
+  showToast('\u23f3 Aplicando cambios\u2026','info',4000);
+  var CHUNK=50,ok=0,errCount=0;
+  for(var i=0;i<ids.length;i+=CHUNK){
+    var lote=ids.slice(i,i+CHUNK);
+    try{var res=await supabase.from('asistencia').update(patch).in('id',lote);if(res.error)errCount+=lote.length;else ok+=lote.length;}catch(e){errCount+=lote.length;}
+  }
+  if(errCount)showToast('\u26a0\ufe0f '+ok+' OK \xb7 '+errCount+' errores','warning',5000);
+  else showToast('\u2705 '+ok+' registros actualizados','success');
+  bemDeselTodos();_registrosCargados=false;cargarRegistros();
+}
+
 function actualizarSelReg(){
   var checks   = Array.from(document.querySelectorAll('.chk-reg'));
   var marcados = checks.filter(function(c){ return c.checked; });
@@ -6200,10 +6377,18 @@ function actualizarSelReg(){
   var cnt = document.getElementById('cntSel');
   if(cnt) cnt.textContent = marcados.length;
   if(btn) btn.style.display = marcados.length > 0 ? '' : 'none';
+  // Panel edición masiva
+  var panelBEM = document.getElementById('barEdicMasiva');
+  var bemCnt   = document.getElementById('bemCnt');
+  if(panelBEM) panelBEM.style.display = marcados.length > 0 ? '' : 'none';
+  if(bemCnt)   bemCnt.textContent = marcados.length;
+  if(marcados.length === 1 || (marcados.length > 0 && document.getElementById('bemCombo') && document.getElementById('bemCombo').options.length <= 1)){
+    bemCargarOpciones();
+  }
   // Resaltar filas seleccionadas
   checks.forEach(function(c){
     var fila = document.getElementById('regfila-' + c.value);
-    if(fila) fila.style.background = c.checked ? 'rgba(224,82,82,.08)' : '';
+    if(fila) fila.style.background = c.checked ? 'rgba(0,152,212,.08)' : '';
   });
 }
 
