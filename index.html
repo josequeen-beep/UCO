@@ -7198,7 +7198,7 @@ function renderPivotTable(regs, dias, filtro) {
   thead.innerHTML = '<tr>' +
     '<th class="th-left" style="min-width:280px">Categoría · Línea · Función</th>' +
     dias.map(function(d){ return '<th style="min-width:60px">'+d.label+'</th>'; }).join('') +
-    '<th style="min-width:70px;background:rgba(0,152,212,.1)">Total</th>' +
+    '<th style="min-width:80px;background:color-mix(in srgb,var(--t-accent2,#0098d4) 12%,transparent);font-size:11px">Prom/día</th>' +
   '</tr>';
 
   // Aplicar filtro de turno
@@ -7260,6 +7260,19 @@ function renderPivotTable(regs, dias, filtro) {
   renderPivotBody();
 }
 
+// Calcula promedio diario de un nodo dado sus totals y los días de la semana
+function _pivotProm(totals, dias) {
+  var con = 0;
+  var gt  = 0;
+  dias.forEach(function(d) {
+    var v = totals[d.fecha] || 0;
+    gt += v;
+    if (v > 0) con++;
+  });
+  if (con === 0) return '—';
+  return '≈ ' + Math.round(gt / con);
+}
+
 function renderPivotBody() {
   var tbody = document.getElementById('tbodyPivot');
   if (!tbody || !_pivotData) return;
@@ -7291,7 +7304,7 @@ function renderPivotBody() {
     filas += '<tr class="pivot-row pivot-l1" onclick="pivotToggle(\'L1\',\''+sub.replace(/\\/g,'\\\\').replace(/\'/g,"\\'")+'\')">' +
       '<td><span class="pivot-toggle">'+toggleL1+'</span><span class="pivot-label">'+x(sub)+'</span></td>' +
       colsSub +
-      '<td class="pivot-num" style="background:rgba(0,152,212,.08)">'+nodoSub.granTotal+'</td>' +
+      '<td class="pivot-num" style="background:color-mix(in srgb,var(--t-accent2,#0098d4) 10%,transparent);font-size:11px">'+_pivotProm(nodoSub.totals,dias)+'</td>' +
     '</tr>';
 
     if (!expL1) return;
@@ -7315,7 +7328,7 @@ function renderPivotBody() {
       filas += '<tr class="pivot-row pivot-l2" onclick="pivotToggle(\'L2\',\''+keyL2.replace(/\\/g,'\\\\').replace(/\'/g,"\\'")+'\')">' +
         '<td><span class="pivot-toggle">'+toggleL2+'</span><span class="pivot-label">'+x(lin)+'</span></td>' +
         colsLin +
-        '<td class="pivot-num">'+nodoLin.granTotal+'</td>' +
+        '<td class="pivot-num" style="font-size:11px">'+_pivotProm(nodoLin.totals,dias)+'</td>' +
       '</tr>';
 
       if (!expL2) return;
@@ -7331,7 +7344,7 @@ function renderPivotBody() {
         filas += '<tr class="pivot-l3">' +
           '<td>'+x(fun)+'</td>' +
           colsFun +
-          '<td class="pivot-num">'+nodoFun.granTotal+'</td>' +
+          '<td class="pivot-num" style="font-size:11px">'+_pivotProm(nodoFun.totals,dias)+'</td>' +
         '</tr>';
       });
     });
