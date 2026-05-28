@@ -643,7 +643,7 @@ console.log('[Supabase v3.1] Listo. Funciones:', Object.keys(_API).join(', '));
    TEMAS — aplicados en <html data-theme="...">
 ═══════════════════════════════════════════════ */
 :root,[data-theme="oceano"]{
-  --t-bg:#f0f5fa; --t-card:#ffffff; --t-border:#cddaea;
+  --t-bg:#f0f5fa; --t-card:#ffffff; --t-border:#cddaea; --t-text-inv:#fff;
   --t-text:#1c2e3e; --t-muted:#6b87a0; --t-light:#e8f4fb;
   --t-accent:#00c6a2; --t-accent2:#0098d4;
   --t-navy:#0d2137; --t-blue:#1a3a5c;
@@ -653,7 +653,7 @@ console.log('[Supabase v3.1] Listo. Funciones:', Object.keys(_API).join(', '));
   --t-shadow:0 8px 32px rgba(13,33,55,.12);
 }
 [data-theme="medianoche"]{
-  --t-bg:#04090f; --t-card:#08152a; --t-border:#142840;
+  --t-bg:#04090f; --t-card:#08152a; --t-border:#142840; --t-text-inv:#fff;
   --t-text:#b8d8f0; --t-muted:#4a7a9b; --t-light:#0a1e35;
   --t-accent:#00e8c0; --t-accent2:#38b6ff;
   --t-navy:#020810; --t-blue:#061526;
@@ -663,7 +663,7 @@ console.log('[Supabase v3.1] Listo. Funciones:', Object.keys(_API).join(', '));
   --t-shadow:0 8px 32px rgba(0,30,60,.5);
 }
 [data-theme="aurora"]{
-  --t-bg:#f5f0ff; --t-card:#ffffff; --t-border:#d8c8ff;
+  --t-bg:#f5f0ff; --t-card:#ffffff; --t-border:#d8c8ff; --t-text-inv:#fff;
   --t-text:#1a0a3c; --t-muted:#7a5ca3; --t-light:#ede5ff;
   --t-accent:#a855f7; --t-accent2:#7c3aed;
   --t-navy:#1a0a3c; --t-blue:#2d1668;
@@ -673,7 +673,7 @@ console.log('[Supabase v3.1] Listo. Funciones:', Object.keys(_API).join(', '));
   --t-shadow:0 8px 32px rgba(124,58,237,.15);
 }
 [data-theme="solar"]{
-  --t-bg:#fffbf0; --t-card:#ffffff; --t-border:#fde68a;
+  --t-bg:#fffbf0; --t-card:#ffffff; --t-border:#fde68a; --t-text-inv:#fff;
   --t-text:#1a1000; --t-muted:#92660a; --t-light:#fef9e7;
   --t-accent:#f59e0b; --t-accent2:#d97706;
   --t-navy:#1a1000; --t-blue:#4a2500;
@@ -683,7 +683,7 @@ console.log('[Supabase v3.1] Listo. Funciones:', Object.keys(_API).join(', '));
   --t-shadow:0 8px 32px rgba(245,158,11,.18);
 }
 [data-theme="bosque"]{
-  --t-bg:#f0faf4; --t-card:#ffffff; --t-border:#bbf7d0;
+  --t-bg:#f0faf4; --t-card:#ffffff; --t-border:#bbf7d0; --t-text-inv:#fff;
   --t-text:#0a2a18; --t-muted:#3d7a56; --t-light:#dcfce7;
   --t-accent:#22c55e; --t-accent2:#16a34a;
   --t-navy:#0a2a18; --t-blue:#14532d;
@@ -693,7 +693,7 @@ console.log('[Supabase v3.1] Listo. Funciones:', Object.keys(_API).join(', '));
   --t-shadow:0 8px 32px rgba(34,197,94,.15);
 }
 [data-theme="rubi"]{
-  --t-bg:#fff5f5; --t-card:#ffffff; --t-border:#fecaca;
+  --t-bg:#fff5f5; --t-card:#ffffff; --t-border:#fecaca; --t-text-inv:#fff;
   --t-text:#1a0000; --t-muted:#7a2a2a; --t-light:#fee2e2;
   --t-accent:#ef4444; --t-accent2:#dc2626;
   --t-navy:#1a0000; --t-blue:#4a0808;
@@ -703,7 +703,7 @@ console.log('[Supabase v3.1] Listo. Funciones:', Object.keys(_API).join(', '));
   --t-shadow:0 8px 32px rgba(239,68,68,.18);
 }
 [data-theme="titanio"]{
-  --t-bg:#f8f8f8; --t-card:#ffffff; --t-border:#e0e0e0;
+  --t-bg:#f8f8f8; --t-card:#ffffff; --t-border:#e0e0e0; --t-text-inv:#fff;
   --t-text:#1a1a1a; --t-muted:#666; --t-light:#f0f0f0;
   --t-accent:#555; --t-accent2:#333;
   --t-navy:#1a1a1a; --t-blue:#2d2d2d;
@@ -1243,14 +1243,14 @@ input.req-error,select.req-error{
   margin-right:6px;user-select:none;font-family:'Courier New',monospace
 }
 .pivot-table .pivot-label{font-weight:600}
-.pivot-table .pivot-l1 td{background:rgba(39,174,96,.08);padding:9px 12px;border-top:1px solid rgba(39,174,96,.2);font-weight:700}
-.pivot-table .pivot-l1:hover td{background:rgba(39,174,96,.16)}
-.pivot-table .pivot-l2 td{background:rgba(0,152,212,.04);padding:7px 12px;padding-left:34px}
-.pivot-table .pivot-l2:hover td{background:rgba(0,152,212,.09)}
+.pivot-table .pivot-l1 td{background:color-mix(in srgb,var(--t-accent,#27ae60) 10%,transparent);padding:9px 12px;border-top:1px solid color-mix(in srgb,var(--t-accent,#27ae60) 25%,transparent);font-weight:700}
+.pivot-table .pivot-l1:hover td{background:color-mix(in srgb,var(--t-accent,#27ae60) 20%,transparent)}
+.pivot-table .pivot-l2 td{background:color-mix(in srgb,var(--t-accent2,#0098d4) 5%,transparent);padding:7px 12px;padding-left:34px}
+.pivot-table .pivot-l2:hover td{background:color-mix(in srgb,var(--t-accent2,#0098d4) 12%,transparent)}
 .pivot-table .pivot-l3 td{background:transparent;padding:5px 12px;padding-left:58px;font-size:12px;color:var(--muted)}
-.pivot-table .pivot-l3:hover td{background:rgba(0,152,212,.05)}
+.pivot-table .pivot-l3:hover td{background:color-mix(in srgb,var(--t-accent2,#0098d4) 7%,transparent)}
 .pivot-table .pivot-num{text-align:center;font-family:'Calibri',sans-serif;font-weight:600}
-.pivot-table tr.pivot-total td{background:linear-gradient(90deg,#0d2137,#1a3a5c)!important;padding:10px 12px;font-weight:700;font-size:13px;border-top:2px solid var(--accent2,#0098d4);color:#fff!important}
+.pivot-table tr.pivot-total td{background:linear-gradient(90deg,var(--t-navy,#0d2137),var(--t-blue,#1a3a5c))!important;padding:10px 12px;font-weight:700;font-size:13px;border-top:2px solid var(--t-accent2,#0098d4);color:var(--t-text-inv,#fff)!important}
 /* ── FIN PIVOT ─── */
 
 /* ── ALERTAS DE CONFLICTO registro + permiso/vacación ── */
@@ -1639,24 +1639,24 @@ body.noche-mode .row-cambio-proceso{background:rgba(255,140,0,.08)!important;out
 .aus-tip-wrap{position:relative;display:inline-block;cursor:pointer;width:100%}
 .aus-tip{
   display:none;position:fixed;z-index:9999;
-  background:#0f1e2d;border:1px solid #2a4a6a;
+  background:var(--t-card,#0f1e2d);border:1px solid var(--t-border,#2a4a6a);
   border-radius:10px;padding:10px 13px;
   box-shadow:0 8px 28px rgba(0,0,0,.45);
   min-width:200px;max-width:280px;
   font-family:'Calibri',sans-serif;font-size:12px;color:#e8f0f7;
   pointer-events:none;
 }
-.aus-tip-title{font-size:11px;font-weight:700;color:#7eb8d4;
+.aus-tip-title{font-size:11px;font-weight:700;color:var(--t-accent2,#7eb8d4);
   text-transform:uppercase;letter-spacing:.4px;margin-bottom:7px;
   border-bottom:1px solid rgba(126,184,212,.2);padding-bottom:5px}
 .aus-tip-row{display:flex;align-items:center;gap:7px;padding:3px 0;border-bottom:1px solid rgba(255,255,255,.05)}
 .aus-tip-row:last-child{border-bottom:none}
-.aus-tip-cod{font-size:10px;color:#7eb8d4;min-width:50px;font-weight:700}
-.aus-tip-nom{font-size:12px;color:#e8f0f7;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.aus-tip-cod{font-size:10px;color:var(--t-accent2,#7eb8d4);min-width:50px;font-weight:700}
+.aus-tip-nom{font-size:12px;color:var(--t-text,#e8f0f7);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .aus-tip-empty{color:rgba(255,255,255,.4);font-style:italic;font-size:11px}
 .combo-table{width:100%;border-collapse:collapse;font-size:13px;min-width:500px}
-.combo-table thead tr{background:linear-gradient(90deg,#1e3a52,#1e4a72)}
-body.noche-mode .combo-table thead tr{background:linear-gradient(90deg,#0d1f2e,#1a3550)}
+.combo-table thead tr{background:linear-gradient(90deg,var(--t-navy,#1e3a52),var(--t-blue,#1e4a72))}
+
 .combo-table thead th{padding:8px 12px;color:#ffffff;
   font-family:'Calibri',sans-serif;font-size:11px;font-weight:700;
   letter-spacing:.3px;text-align:center;border-right:1px solid rgba(255,255,255,.08);white-space:nowrap}
@@ -1669,11 +1669,11 @@ body.noche-mode .combo-table tbody td.td-linea{background:rgba(0,0,0,.15)}
 .combo-table tbody td.td-cc{padding-left:20px;color:var(--muted);font-size:11px}
 .combo-table tbody td.td-num{text-align:center;font-family:'Calibri',sans-serif;font-size:15px
   font-size:14px;font-weight:700;color:var(--accent2)}
-.combo-table tbody tr.tr-subtotal td{background:rgba(0,152,212,.06);
-  font-weight:700;font-size:12px;color:var(--accent2)}
-body.noche-mode .combo-table tbody tr.tr-subtotal td{background:rgba(0,152,212,.08)}
-.combo-table tbody tr.tr-gran-total td{background:linear-gradient(90deg,#0f1e2d,#1e3a52);
-  color:#fff;font-family:'Calibri',sans-serif;font-size:13px;
+.combo-table tbody tr.tr-subtotal td{background:color-mix(in srgb,var(--t-accent2,#0098d4) 8%,transparent);
+  font-weight:700;font-size:12px;color:var(--t-accent2,#0098d4)}
+
+.combo-table tbody tr.tr-gran-total td{background:linear-gradient(90deg,var(--t-navy,#0f1e2d),var(--t-blue,#1e3a52))!important;
+  color:var(--t-text-inv,#fff)!important;font-family:'Calibri',sans-serif;font-size:13px;
   font-weight:800;padding:10px 12px}
 .combo-table tbody tr.tr-gran-total td.td-num{color:#ffffff;font-size:15px;font-weight:800}
 .combo-table tbody tr:not(.tr-subtotal):not(.tr-gran-total):hover td{background:var(--light)}
