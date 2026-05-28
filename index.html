@@ -6531,31 +6531,58 @@ async function bemConfirmar(){
     //          r[10]=especie r[11]=producto r[12]=proceso r[13]=operacion
     //          r[14]=proc_ini r[15]=proc_ter r[16]=atraso r[17]=desc_ini r[18]=desc_ter
     //          r[19]=desay_prog r[20]=col_ini r[21]=col_ter r[22]=col_prog r[24]=id
-    var hDesc = cambios._desayuno ? _bemHorasDesayuno(r[1]) : null;
-    var hCol  = cambios._colacion ? _bemHorasColacion(r[1], r[3]) : null;
+    var fecha = String(r[1]||'').substring(0,10);
+    var hDesc = cambios._desayuno ? _bemHorasDesayuno(fecha) : null;
+    var hCol  = cambios._colacion ? _bemHorasColacion(fecha, r[3]) : null;
+
+    // proceso_inicio/termino: panel envía HH:MM → combinar con fecha del registro
+    // r[14]/r[15] vienen como "yyyy-MM-dd HH:mm:ss" desde _fmtTs → _toISO los convierte
+    function _bemDt(fecha, val){
+      if(!val) return null;
+      var s = String(val).trim();
+      // Solo HH:MM o HH:MM:SS → combinar con fecha
+      if(/^\d{1,2}:\d{2}(:\d{2})?$/.test(s)) return fecha+'T'+s.padStart(8,'0')+':00'.slice(s.length>5?0:3);
+      return _toISO(s);
+    }
+
+    // r[14]/r[15] pueden venir como "HH:MM" puro si la BD los guardó así
+    function _bemSafeTs(fecha, raw){
+      if(!raw) return null;
+      var s = String(raw).trim();
+      // Solo hora HH:MM o HH:MM:SS → combinar con fecha
+      if(/^\d{1,2}:\d{2}/.test(s) && s.length <= 8) return fecha + 'T' + s + (s.length===5?':00':'');
+      return _toISO(s) || null;
+    }
+    var proc_ini = cambios.proceso_inicio
+      ? _bemDt(fecha, cambios.proceso_inicio)
+      : _bemSafeTs(fecha, r[14]);
+    var proc_ter = cambios.proceso_termino
+      ? _bemDt(fecha, cambios.proceso_termino)
+      : _bemSafeTs(fecha, r[15]);
+
     var nuevo={
       mes:          r[0]||'',
-      fecha:        r[1]||'',
+      fecha:        fecha,
       responsable:  r[2]||'',
       turno:        r[3]||'',
       linea:        r[4]||'',
       codigo:       r[5]||'',
       nombre:       r[6]||'',
       tipo_contrato:r[7]||'',
-      funcion:      r[8]||'',             // siempre del original
-      centro_costo: r[9]||'',             // siempre del original
+      funcion:      r[8]||'',
+      centro_costo: r[9]||'',
       especie:      cambios.especie   || r[10]||'',
       producto:     cambios.producto  || r[11]||'',
       proceso:      cambios.proceso   || r[12]||'',
       operacion:    cambios.operacion || r[13]||'',
-      proceso_inicio:  cambios.proceso_inicio  || r[14]||null,
-      proceso_termino: cambios.proceso_termino || r[15]||null,
+      proceso_inicio:  proc_ini,
+      proceso_termino: proc_ter,
       atraso_inicio:   r[16]||'0',
-      descanso_inicio:  hDesc ? hDesc.ini : (r[17]||null),
-      descanso_termino: hDesc ? hDesc.ter : (r[18]||null),
+      descanso_inicio:  hDesc ? _toISO(hDesc.ini) : _bemSafeTs(fecha, r[17]),
+      descanso_termino: hDesc ? _toISO(hDesc.ter) : _bemSafeTs(fecha, r[18]),
       desayuno_programado: cambios._desayuno ? 'Programado' : (r[19]||''),
-      colacion_inicio:  hCol ? hCol.ini : (r[20]||null),
-      colacion_termino: hCol ? hCol.ter : (r[21]||null),
+      colacion_inicio:  hCol ? _toISO(hCol.ini) : _bemSafeTs(fecha, r[20]),
+      colacion_termino: hCol ? _toISO(hCol.ter) : _bemSafeTs(fecha, r[21]),
       colacion_programado: cambios._colacion ? 'Programado' : (r[22]||'')
     };
 
