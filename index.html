@@ -2703,16 +2703,16 @@ body.noche-mode .modal-field input,body.noche-mode .modal-field select{color-sch
           <label>DESAYUNO</label>
           <label style="display:flex;align-items:center;gap:5px;cursor:pointer;margin-top:2px">
             <input type="checkbox" id="bemAplicaDesayuno" onchange="bemToggleDesayuno(this.checked)"
-              style="width:14px;height:14px;accent-color:#0098d4;cursor:pointer">
-            <span style="font-size:11px;color:#e0f0ff">Aplica 10:00–10:15</span>
+              style="width:16px;height:16px;accent-color:var(--t-accent2,#0098d4);cursor:pointer;flex-shrink:0">
+            <span id="bemDesayunoLbl" style="font-size:11px;color:var(--t-text,#e0f0ff);font-weight:600">Aplica 10:00–10:15</span>
           </label>
         </div>
         <div class="bem-field">
           <label>COLACIÓN</label>
           <label style="display:flex;align-items:center;gap:5px;cursor:pointer;margin-top:2px">
             <input type="checkbox" id="bemAplicaColacion" onchange="bemToggleColacion(this.checked)"
-              style="width:14px;height:14px;accent-color:#0098d4;cursor:pointer">
-            <span style="font-size:11px;color:#e0f0ff">Aplica según turno</span>
+              style="width:16px;height:16px;accent-color:var(--t-accent2,#0098d4);cursor:pointer;flex-shrink:0">
+            <span id="bemColacionLbl" style="font-size:11px;color:var(--t-text,#e0f0ff);font-weight:600">Aplica según turno</span>
           </label>
         </div>
         <div class="bem-sep"></div>
@@ -6419,15 +6419,16 @@ function bemOnProducto(){
 }
 
 function bemToggleDesayuno(checked){
-  var lbl=document.querySelector('#bemAplicaDesayuno + span');
-  if(lbl) lbl.textContent = checked ? '✅ 10:00–10:15 (−15 min)' : 'Aplica 10:00–10:15';
+  var lbl=document.getElementById('bemDesayunoLbl');
+  if(lbl){ lbl.textContent = checked ? '✅ 10:00–10:15 (−15 min)' : 'Aplica 10:00–10:15';
+    lbl.style.color = checked ? 'var(--t-accent2,#0098d4)' : 'var(--t-text,#e0f0ff)'; }
 }
 
 function bemToggleColacion(checked){
-  var lbl=document.querySelector('#bemAplicaColacion + span');
+  var lbl=document.getElementById('bemColacionLbl');
   if(!lbl) return;
-  if(checked) lbl.textContent='✅ Según turno (−30 min)';
-  else lbl.textContent='Aplica según turno';
+  lbl.textContent = checked ? '✅ Según turno (−30 min)' : 'Aplica según turno';
+  lbl.style.color = checked ? 'var(--t-accent2,#0098d4)' : 'var(--t-text,#e0f0ff)';
 }
 
 // Calcula horas de desayuno/colación igual que el formulario
@@ -7336,10 +7337,10 @@ function renderPivotBody() {
     });
   });
 
-  // Fila Total general — recalcular sumando desde l1 para garantizar coherencia
+  // Fila Promedio — recalcular sumando desde l1
   var _totByDay = {};
   dias.forEach(function(d){ _totByDay[d.fecha] = 0; });
-  var _gt = 0;
+  var _gt = 0, _diasConDatos = 0;
   Object.keys(_pivotData.l1).forEach(function(sub) {
     var nodo = _pivotData.l1[sub];
     dias.forEach(function(d) {
@@ -7348,12 +7349,14 @@ function renderPivotBody() {
     });
     _gt += nodo.granTotal || 0;
   });
+  dias.forEach(function(d){ if(_totByDay[d.fecha]>0) _diasConDatos++; });
+  var _prom = _diasConDatos > 0 ? Math.round(_gt / _diasConDatos) : 0;
   var colsTotal = dias.map(function(d) {
     var v = _totByDay[d.fecha];
     return '<td class="pivot-num">'+(v||'—')+'</td>';
   }).join('');
   filas += '<tr class="pivot-total">' +
-    '<td>📊 Total general</td>' +
+    '<td>📊 Promedio diario &nbsp;<span style="font-size:15px;font-family:Calibri,sans-serif">≈ '+_prom+' <span style="font-size:11px;font-weight:500;opacity:.8">/ día ('+_diasConDatos+' día'+(_diasConDatos!==1?'s':'')+')</span></span></td>' +
     colsTotal +
     '<td class="pivot-num">'+(_gt||'—')+'</td>' +
   '</tr>';
