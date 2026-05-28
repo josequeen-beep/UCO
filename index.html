@@ -1350,15 +1350,15 @@ body.noche-mode .programado-row{background:rgba(56,182,255,.04);border-color:rgb
 .programado-row input[type=checkbox]{width:17px;height:17px;cursor:pointer;accent-color:var(--accent2);flex-shrink:0}
 
 /* ── Panel Edición Masiva ── */
+@keyframes slideDown{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
 #barEdicMasiva{
   display:none;z-index:90;
-  background:linear-gradient(135deg,#0d2137,#1a3a5c);
-  border:1px solid #0098d4;border-radius:8px;
+  background:var(--t-card,#0d2137);
+  border:1px solid var(--t-accent2,#0098d4);border-radius:8px;
   padding:8px 12px;margin:0 0 6px 0;
-  box-shadow:0 3px 12px rgba(0,152,212,.25);
+  box-shadow:0 3px 12px rgba(0,0,0,.18);
   animation:slideDown .2s ease
 }
-@keyframes slideDown{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
 /* ── Modal BEM ── */
 #bemModal{
   display:none;position:fixed;inset:0;z-index:9999;
@@ -1366,43 +1366,43 @@ body.noche-mode .programado-row{background:rgba(56,182,255,.04);border-color:rgb
   align-items:center;justify-content:center
 }
 #bemModalBox{
-  background:linear-gradient(160deg,#0d2137,#1a3a5c);
-  border:1px solid #0098d4;border-radius:12px;
+  background:var(--t-card,#0d2137);
+  border:1px solid var(--t-accent2,#0098d4);border-radius:12px;
   padding:24px;min-width:360px;max-width:520px;width:90%;
-  box-shadow:0 8px 32px rgba(0,152,212,.3);
+  box-shadow:0 8px 32px rgba(0,0,0,.3);
   animation:slideDown .2s ease
 }
-#bemModalBox h4{color:#0098d4;font-size:14px;margin:0 0 14px;letter-spacing:.5px}
+#bemModalBox h4{color:var(--t-accent2,#0098d4);font-size:14px;margin:0 0 14px;letter-spacing:.5px}
 .bem-modal-btns{display:flex;gap:8px;justify-content:flex-end;margin-top:16px}
 .bem-modal-btns button{border:none;border-radius:7px;padding:8px 18px;font-size:13px;font-weight:700;cursor:pointer}
-.bem-btn-confirm{background:#0098d4;color:#fff}
-.bem-btn-confirm:hover{background:#00b8f0}
-.bem-btn-cancel{background:#1e4060;color:#8ab}
-.bem-btn-cancel:hover{background:#234a74;color:#fff}
-#barEdicMasiva .bem-title{color:#0098d4;font-size:11px;font-weight:700;letter-spacing:.5px;margin-bottom:6px;display:flex;align-items:center;gap:6px}
+.bem-btn-confirm{background:var(--t-accent2,#0098d4);color:#fff}
+.bem-btn-confirm:hover{filter:brightness(1.15)}
+.bem-btn-cancel{background:var(--t-light,#1e4060);color:var(--t-muted,#8ab);border:1px solid var(--t-border)}
+.bem-btn-cancel:hover{background:var(--t-border);color:var(--t-text)}
+#barEdicMasiva .bem-title{color:var(--t-accent2,#0098d4);font-size:11px;font-weight:700;letter-spacing:.5px;margin-bottom:6px;display:flex;align-items:center;gap:6px}
 #barEdicMasiva .bem-row{display:flex;flex-wrap:wrap;gap:6px;align-items:flex-end}
 #barEdicMasiva .bem-field{display:flex;flex-direction:column;gap:2px}
-#barEdicMasiva .bem-field label{font-size:10px;color:#8ab;font-weight:600;letter-spacing:.3px}
+#barEdicMasiva .bem-field label{font-size:10px;color:var(--t-muted,#8ab);font-weight:600;letter-spacing:.3px}
 #barEdicMasiva .bem-field select,#barEdicMasiva .bem-field input{
-  background:#0a1e2e;color:#e0f0ff;border:1px solid #1e4060;
-  border-radius:5px;padding:4px 7px;font-size:12px;min-width:120px;
-  cursor:pointer
+  background:var(--t-bg,#0a1e2e);color:var(--t-text,#e0f0ff);
+  border:1px solid var(--t-border,#1e4060);
+  border-radius:5px;padding:4px 7px;font-size:12px;min-width:120px;cursor:pointer
 }
-#barEdicMasiva .bem-field select:focus,#barEdicMasiva .bem-field input:focus{outline:none;border-color:#0098d4}
-#barEdicMasiva .bem-sep{width:1px;background:#1e4060;align-self:stretch;margin:0 2px}
+#barEdicMasiva .bem-field select:focus,#barEdicMasiva .bem-field input:focus{outline:none;border-color:var(--t-accent2,#0098d4)}
+#barEdicMasiva .bem-sep{width:1px;background:var(--t-border,#1e4060);align-self:stretch;margin:0 2px}
 #barEdicMasiva .bem-btn-apply{
-  background:#0098d4;color:#fff;border:none;border-radius:6px;
-  padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer;
-  transition:background .15s;white-space:nowrap
+  background:var(--t-accent2,#0098d4);color:#fff;border:none;border-radius:6px;
+  padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap
 }
-#barEdicMasiva .bem-btn-apply:hover{background:#00b8f0}
+#barEdicMasiva .bem-btn-apply:hover{filter:brightness(1.15)}
 #barEdicMasiva .bem-btn-sel{
-  background:transparent;color:#8ab;border:1px solid #1e4060;
+  background:transparent;color:var(--t-muted,#8ab);
+  border:1px solid var(--t-border,#1e4060);
   border-radius:5px;padding:4px 9px;font-size:11px;cursor:pointer;white-space:nowrap
 }
-#barEdicMasiva .bem-btn-sel:hover{border-color:#0098d4;color:#0098d4}
+#barEdicMasiva .bem-btn-sel:hover{border-color:var(--t-accent2,#0098d4);color:var(--t-accent2,#0098d4)}
 #barEdicMasiva .bem-cnt{
-  background:#e05252;color:#fff;border-radius:10px;
+  background:var(--danger,#e05252);color:#fff;border-radius:10px;
   padding:1px 7px;font-size:11px;font-weight:700
 }
 .prog-hint{margin-left:auto;font-size:11px;color:var(--muted);background:var(--light);
@@ -1498,9 +1498,9 @@ thead th{padding:9px 11px;text-align:left;font-family:'Calibri',sans-serif;
 thead th:hover{background:rgba(255,255,255,.08)}
 thead th.no-sort{cursor:default}
 thead th.no-sort:hover{background:transparent}
-tbody tr{border-bottom:1px solid var(--border);transition:background .12s}
-tbody tr:hover{background:var(--light)}
-body.noche-mode tbody tr:hover{background:rgba(56,182,255,.05)}
+tbody tr{border-bottom:1px solid var(--border)}
+tbody tr:hover td{background:var(--light)}
+body.noche-mode tbody tr:hover td{background:rgba(56,182,255,.05)}
 tbody td{padding:7px 11px;color:var(--text);border-right:1px solid var(--border);white-space:nowrap}
 tbody tr:nth-child(even){background:transparent}
 body.noche-mode tbody tr:nth-child(even){background:transparent}
@@ -1557,27 +1557,27 @@ input.chk-reg:hover:not(:checked){ border-color:#e05252; }
 
 /* ══ Fila duplicada / cambio de proceso ══ */
 .row-duplicado{background:rgba(224,82,82,.10)!important;outline:1.5px solid rgba(224,82,82,.35)}
-.row-duplicado:hover{background:rgba(224,82,82,.17)!important}
+.row-duplicado:hover td{background:rgba(224,82,82,.17)!important}
 body.noche-mode .row-duplicado{background:rgba(255,80,80,.08)!important;outline:1.5px solid rgba(255,100,100,.3)}
 /* ── Cambio proceso — colores únicos por número ── */
 .row-cambio-proceso{background:rgba(255,152,0,.10)!important;outline:1.5px solid rgba(255,152,0,.4)}
-.row-cambio-proceso:hover{background:rgba(255,152,0,.17)!important}
+.row-cambio-proceso:hover td{background:rgba(255,152,0,.17)!important}
 body.noche-mode .row-cambio-proceso{background:rgba(255,140,0,.08)!important;outline:1.5px solid rgba(255,160,0,.3)}
 /* Cambio 1 — Naranja */
 .row-cambio-1{background:rgba(255,152,0,.10)!important;outline:1.5px solid rgba(255,152,0,.45)}
-.row-cambio-1:hover{background:rgba(255,152,0,.18)!important}
+.row-cambio-1:hover td{background:rgba(255,152,0,.18)!important}
 /* Cambio 2 — Azul */
 .row-cambio-2{background:rgba(37,99,235,.09)!important;outline:1.5px solid rgba(37,99,235,.4)}
-.row-cambio-2:hover{background:rgba(37,99,235,.16)!important}
+.row-cambio-2:hover td{background:rgba(37,99,235,.16)!important}
 /* Cambio 3 — Verde */
 .row-cambio-3{background:rgba(22,163,74,.09)!important;outline:1.5px solid rgba(22,163,74,.4)}
-.row-cambio-3:hover{background:rgba(22,163,74,.16)!important}
+.row-cambio-3:hover td{background:rgba(22,163,74,.16)!important}
 /* Cambio 4 — Morado */
 .row-cambio-4{background:rgba(124,58,237,.09)!important;outline:1.5px solid rgba(124,58,237,.4)}
-.row-cambio-4:hover{background:rgba(124,58,237,.16)!important}
+.row-cambio-4:hover td{background:rgba(124,58,237,.16)!important}
 /* Cambio 5 — Rosado */
 .row-cambio-5{background:rgba(219,39,119,.09)!important;outline:1.5px solid rgba(219,39,119,.4)}
-.row-cambio-5:hover{background:rgba(219,39,119,.16)!important}
+.row-cambio-5:hover td{background:rgba(219,39,119,.16)!important}
 /* Resaltado por estado de ausencia */
 .row-vacacion{background:rgba(0,148,212,.08)!important;border-left:3px solid #0094d4!important}
 .row-vacacion:hover{background:rgba(0,148,212,.14)!important}
