@@ -2680,11 +2680,11 @@ body.noche-mode .modal-field input,body.noche-mode .modal-field select{color-sch
         <div class="bem-sep"></div>
         <div class="bem-field">
           <label>ESPECIE</label>
-          <select id="bemEspecie"><option value="">Sin cambio</option></select>
+          <select id="bemEspecie" onchange="bemOnEspecie()"><option value="">Sin cambio</option></select>
         </div>
         <div class="bem-field">
           <label>PRODUCTO</label>
-          <select id="bemProducto"><option value="">Sin cambio</option></select>
+          <select id="bemProducto" onchange="bemOnProducto()"><option value="">Sin cambio</option></select>
         </div>
         <div class="bem-field">
           <label>PROCESO</label>
@@ -6346,14 +6346,27 @@ function bemCargarOpciones() {
   if(sc){
     sc.innerHTML='<option value="">— Seleccionar combinación —</option>';
     Array.from(combos.values()).sort(function(a,b){return(a.especie+a.producto).localeCompare(b.especie+b.producto,'es');}).forEach(function(c,i){
-      var parts=[c.especie,c.producto,c.funcion,c.proceso,c.operacion].filter(Boolean);
+      var parts=[c.especie,c.producto,c.proceso,c.operacion].filter(Boolean);
       var opt=document.createElement('option');opt.value=i;opt.textContent=parts.join(' · ');
       opt.dataset.especie=c.especie;opt.dataset.producto=c.producto;opt.dataset.funcion=c.funcion;opt.dataset.proceso=c.proceso;opt.dataset.operacion=c.operacion;
       sc.appendChild(opt);
     });
   }
   function fs2(id,set){var s=document.getElementById(id);if(!s)return;s.innerHTML='<option value="">Sin cambio</option>';Array.from(set).sort().forEach(function(v){var o=document.createElement('option');o.value=v;o.textContent=v;s.appendChild(o);});}
-  fs2('bemEspecie',especies);fs2('bemProducto',productos);fs2('bemFuncion',funciones);
+  // Especie: cargar desde catálogo completo (getListData) si disponible
+  var seEl=document.getElementById('bemEspecie');
+  if(seEl){
+    if(window._listas && window._listas.especies && window._listas.especies.length){
+      fs2('bemEspecie',new Set(window._listas.especies));
+    } else {
+      fs2('bemEspecie',especies);
+      // Intentar cargar catálogo en background
+      getListData().then(function(d){
+        fs2('bemEspecie',new Set(d.especies||[]));
+      }).catch(function(){});
+    }
+  }
+  fs2('bemProducto',productos);
   function fdl(id,set){var d=document.getElementById(id);if(!d)return;d.innerHTML='';Array.from(set).sort().forEach(function(v){var o=document.createElement('option');o.value=v;d.appendChild(o);});}
   fdl('bemProcesoList',procesos);fdl('bemOperList',operaciones);
 }
@@ -6376,6 +6389,50 @@ function bemSelLinea(){
 }
 function bemSelTodos(){document.querySelectorAll('.chk-reg').forEach(function(c){c.checked=true;});actualizarSelReg();}
 function bemDeselTodos(){document.querySelectorAll('.chk-reg').forEach(function(c){c.checked=false;});actualizarSelReg();}
+
+// Cascada BEM: especie → producto → proceso/operación (igual que formulario)
+function bemOnEspecie(){
+  var esp=document.getElementById('bemEspecie').value;
+  var sp=document.getElementById('bemProducto');
+  var dlPr=document.getElementById('bemProcesoList');
+  var dlOp=document.getElementById('bemOperList');
+  if(!sp) return;
+  sp.innerHTML='<option value="">Sin cambio</option>';
+  if(dlPr) dlPr.innerHTML='';
+  if(dlOp) dlOp.innerHTML='';
+  if(!esp || !window._listas) return;
+  var mE=window._listas.mapaEspecie||{};
+  var prods=(mE[esp]&&mE[esp].productos)||[];
+  prods.sort().forEach(function(p){
+    var o=document.createElement('option');o.value=p;o.textContent=p;sp.appendChild(o);
+  });
+  // Si hay un solo producto, seleccionarlo automáticamente
+  if(prods.length===1){ sp.value=prods[0]; bemOnProducto(); }
+}
+
+function bemOnProducto(){
+  var esp=document.getElementById('bemEspecie').value;
+  var pro=document.getElementById('bemProducto').value;
+  var dlPr=document.getElementById('bemProcesoList');
+  var dlOp=document.getElementById('bemOperList');
+  if(!esp||!pro||!window._listas) return;
+  var mP=window._listas.mapaProducto||{};
+  var k=esp+'||'+pro;
+  var datos=mP[k]||{};
+  if(dlPr){
+    dlPr.innerHTML='';
+    (datos.procesos||[]).sort().forEach(function(v){var o=document.createElement('option');o.value=v;dlPr.appendChild(o);});
+    // Autocompletar si hay uno solo
+    var inp=document.getElementById('bemProceso');
+    if(inp && datos.procesos && datos.procesos.length===1) inp.value=datos.procesos[0];
+  }
+  if(dlOp){
+    dlOp.innerHTML='';
+    (datos.operaciones||[]).sort().forEach(function(v){var o=document.createElement('option');o.value=v;dlOp.appendChild(o);});
+    var inp2=document.getElementById('bemOperacion');
+    if(inp2 && datos.operaciones && datos.operaciones.length===1) inp2.value=datos.operaciones[0];
+  }
+}
 
 function bemToggleDesayuno(checked){
   var lbl=document.querySelector('#bemAplicaDesayuno + span');
