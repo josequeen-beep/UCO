@@ -2687,10 +2687,6 @@ body.noche-mode .modal-field input,body.noche-mode .modal-field select{color-sch
           <select id="bemProducto"><option value="">Sin cambio</option></select>
         </div>
         <div class="bem-field">
-          <label>FUNCIÓN</label>
-          <select id="bemFuncion"><option value="">Sin cambio</option></select>
-        </div>
-        <div class="bem-field">
           <label>PROCESO</label>
           <input type="text" id="bemProceso" placeholder="Sin cambio" list="bemProcesoList">
           <datalist id="bemProcesoList"></datalist>
@@ -6320,13 +6316,14 @@ window.addEventListener('online', ()=>{
 
 function bemCargarOpciones() {
   var rows = (typeof todosRegistros !== 'undefined' && todosRegistros.length) ? todosRegistros : (window._filteredRows || window._allRows || []);
+  // Índices: r[8]=funcion, r[9]=centro_costo, r[10]=especie, r[11]=producto, r[12]=proceso, r[13]=operacion
   var especies=new Set(),productos=new Set(),funciones=new Set(),procesos=new Set(),operaciones=new Set();
   var combos=new Map();
   rows.forEach(function(r){
-    var e=r[9]||'',p=r[10]||'',f=r[8]||'',pr=r[11]||'',op=r[12]||'';
+    var e=r[10]||'',p=r[11]||'',f=r[8]||'',pr=r[12]||'',op=r[13]||'';
     if(e)especies.add(e); if(p)productos.add(p); if(f)funciones.add(f);
     if(pr)procesos.add(pr); if(op)operaciones.add(op);
-    if(e||p||f||pr||op){var k=[e,p,f,pr,op].join('|');if(!combos.has(k))combos.set(k,{especie:e,producto:p,funcion:f,proceso:pr,operacion:op});}
+    if(e||p||pr||op){var k=[e,p,f,pr,op].join('|');if(!combos.has(k))combos.set(k,{especie:e,producto:p,funcion:f,proceso:pr,operacion:op});}
   });
   var sc=document.getElementById('bemCombo');
   if(sc){
@@ -6371,14 +6368,13 @@ function bemAplicar(){
   var cambios={};
   var especie  =(document.getElementById('bemEspecie').value||'').trim();
   var producto =(document.getElementById('bemProducto').value||'').trim();
-  var funcion  =(document.getElementById('bemFuncion').value||'').trim();
   var proceso  =(document.getElementById('bemProceso').value||'').trim();
   var operacion=(document.getElementById('bemOperacion').value||'').trim();
   var hi       =(document.getElementById('bemHoraInicio').value||'').trim();
   var hc       =(document.getElementById('bemHoraCorte').value||'').trim();
   if(especie)   cambios.especie=especie;
   if(producto)  cambios.producto=producto;
-  if(funcion)   cambios.funcion=funcion;
+  // funcion NO se cambia — se mantiene del original
   if(proceso)   cambios.proceso=proceso;
   if(operacion) cambios.operacion=operacion;
   if(hi)        cambios.proceso_inicio=hi;
@@ -6401,7 +6397,7 @@ function bemAplicar(){
   });
 
   // Construir preview
-  var labels={'especie':'Especie','producto':'Producto','funcion':'Función','proceso':'Proceso','operacion':'Operación','proceso_inicio':'Hora Inicio','proceso_termino':'Hora Corte'};
+  var labels={'especie':'Especie','producto':'Producto','proceso':'Proceso','operacion':'Operación','proceso_inicio':'Hora Inicio','proceso_termino':'Hora Corte'};
   var preview=Object.keys(cambios).map(function(k){
     return '<div style="display:flex;gap:8px;align-items:center;padding:4px 0;border-bottom:1px solid #1e4060">'
       +'<span style="color:#8ab;font-size:11px;width:100px;flex-shrink:0">'+labels[k]+'</span>'
@@ -6424,29 +6420,44 @@ async function bemConfirmar(){
   var modal=document.getElementById('bemModal');
   if(modal) modal.style.display='none';
   var p=window._bemPending||{};
-  var ids=p.ids||[], idxMap=p.idxMap||{}, cambios=p.cambios||{};
+  var ids=p.ids||[], cambios=p.cambios||{};
   if(!ids.length) return;
+
+  // Construir mapa id→row desde todosRegistros (id está en r[24])
+  var rowById={};
+  if(typeof todosRegistros!=='undefined'){
+    todosRegistros.forEach(function(r){ if(r[24]) rowById[String(r[24])]=r; });
+  }
 
   showToast('⏳ Creando copias…','info',4000);
   var ok=0, errCount=0;
 
   for(var i=0;i<ids.length;i++){
-    var id=ids[i];
-    var idx=idxMap[id];
-    var r=(typeof todosRegistros!=='undefined'&&idx!==undefined)?todosRegistros[idx]:null;
-    if(!r){ errCount++; continue; }
+    var r=rowById[String(ids[i])];
+    if(!r){ console.warn('No se encontró row para id',ids[i]); errCount++; continue; }
 
+    // Índices: r[0]=mes r[1]=fecha r[2]=resp r[3]=turno r[4]=linea
+    //          r[5]=codigo r[6]=nombre r[7]=tipo_contrato r[8]=funcion r[9]=cc
+    //          r[10]=especie r[11]=producto r[12]=proceso r[13]=operacion
+    //          r[14]=proc_ini r[15]=proc_ter r[16]=atraso r[17]=desc_ini r[18]=desc_ter
+    //          r[19]=desay_prog r[20]=col_ini r[21]=col_ter r[22]=col_prog r[24]=id
     var nuevo={
-      mes:r[0], fecha:r[1], responsable:r[2], turno:r[3], linea:r[4],
-      codigo:r[5], nombre:r[6], tipo_contrato:r[7],
-      funcion:    cambios.funcion    || r[8]  || '',
-      centro_costo:               r[9]  || '',
-      especie:    cambios.especie   || r[10] || '',
-      producto:   cambios.producto  || r[11] || '',
-      proceso:    cambios.proceso   || r[12] || '',
-      operacion:  cambios.operacion || r[13] || '',
-      proceso_inicio:  cambios.proceso_inicio  || r[14] || null,
-      proceso_termino: cambios.proceso_termino || r[15] || null,
+      mes:          r[0]||'',
+      fecha:        r[1]||'',
+      responsable:  r[2]||'',
+      turno:        r[3]||'',
+      linea:        r[4]||'',
+      codigo:       r[5]||'',
+      nombre:       r[6]||'',
+      tipo_contrato:r[7]||'',
+      funcion:      r[8]||'',             // siempre del original
+      centro_costo: r[9]||'',             // siempre del original
+      especie:      cambios.especie   || r[10]||'',
+      producto:     cambios.producto  || r[11]||'',
+      proceso:      cambios.proceso   || r[12]||'',
+      operacion:    cambios.operacion || r[13]||'',
+      proceso_inicio:  cambios.proceso_inicio  || r[14]||null,
+      proceso_termino: cambios.proceso_termino || r[15]||null,
       atraso_inicio:   r[16]||'0',
       descanso_inicio: r[17]||null,
       descanso_termino:r[18]||null,
@@ -6458,12 +6469,13 @@ async function bemConfirmar(){
 
     try{
       var res=await _sbDb().from('registros').insert(nuevo);
-      if(res.error){ console.error(res.error); errCount++; } else ok++;
-    }catch(e){ console.error(e); errCount++; }
+      if(res.error){ console.error('[BEM INSERT]',res.error.message); errCount++; }
+      else ok++;
+    }catch(e){ console.error('[BEM INSERT]',e); errCount++; }
   }
 
   if(errCount) showToast('⚠️ '+ok+' copiados · '+errCount+' errores','warning',5000);
-  else showToast('✅ '+ok+' registros copiados correctamente','success');
+  else showToast('✅ '+ok+' registros copiados','success');
   bemDeselTodos();
   _registrosCargados=false;
   cargarRegistros();
