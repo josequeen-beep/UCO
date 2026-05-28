@@ -2671,13 +2671,6 @@ body.noche-mode .modal-field input,body.noche-mode .modal-field select{color-sch
           </div>
         </div>
         <div class="bem-sep"></div>
-        <div class="bem-field" style="min-width:220px">
-          <label>COMBINACIÓN PROCESO</label>
-          <select id="bemCombo" onchange="bemAutoFill()">
-            <option value="">— Seleccionar combinación —</option>
-          </select>
-        </div>
-        <div class="bem-sep"></div>
         <div class="bem-field">
           <label>ESPECIE</label>
           <select id="bemEspecie" onchange="bemOnEspecie()"><option value="">Sin cambio</option></select>
@@ -6342,16 +6335,7 @@ function bemCargarOpciones() {
     if(pr)procesos.add(pr); if(op)operaciones.add(op);
     if(e||p||pr||op){var k=[e,p,f,pr,op].join('|');if(!combos.has(k))combos.set(k,{especie:e,producto:p,funcion:f,proceso:pr,operacion:op});}
   });
-  var sc=document.getElementById('bemCombo');
-  if(sc){
-    sc.innerHTML='<option value="">— Seleccionar combinación —</option>';
-    Array.from(combos.values()).sort(function(a,b){return(a.especie+a.producto).localeCompare(b.especie+b.producto,'es');}).forEach(function(c,i){
-      var parts=[c.especie,c.producto,c.proceso,c.operacion].filter(Boolean);
-      var opt=document.createElement('option');opt.value=i;opt.textContent=parts.join(' · ');
-      opt.dataset.especie=c.especie;opt.dataset.producto=c.producto;opt.dataset.funcion=c.funcion;opt.dataset.proceso=c.proceso;opt.dataset.operacion=c.operacion;
-      sc.appendChild(opt);
-    });
-  }
+  // (combo eliminado del panel)
   function fs2(id,set){var s=document.getElementById(id);if(!s)return;s.innerHTML='<option value="">Sin cambio</option>';Array.from(set).sort().forEach(function(v){var o=document.createElement('option');o.value=v;o.textContent=v;s.appendChild(o);});}
   // Especie: cargar desde catálogo completo (getListData) si disponible
   var seEl=document.getElementById('bemEspecie');
