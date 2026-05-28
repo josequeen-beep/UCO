@@ -2706,6 +2706,23 @@ body.noche-mode .modal-field input,body.noche-mode .modal-field select{color-sch
           <input type="time" id="bemHoraCorte" style="min-width:90px">
         </div>
         <div class="bem-sep"></div>
+        <div class="bem-field">
+          <label>DESAYUNO</label>
+          <label style="display:flex;align-items:center;gap:5px;cursor:pointer;margin-top:2px">
+            <input type="checkbox" id="bemAplicaDesayuno" onchange="bemToggleDesayuno(this.checked)"
+              style="width:14px;height:14px;accent-color:#0098d4;cursor:pointer">
+            <span style="font-size:11px;color:#e0f0ff">Aplica 10:00–10:15</span>
+          </label>
+        </div>
+        <div class="bem-field">
+          <label>COLACIÓN</label>
+          <label style="display:flex;align-items:center;gap:5px;cursor:pointer;margin-top:2px">
+            <input type="checkbox" id="bemAplicaColacion" onchange="bemToggleColacion(this.checked)"
+              style="width:14px;height:14px;accent-color:#0098d4;cursor:pointer">
+            <span style="font-size:11px;color:#e0f0ff">Aplica según turno</span>
+          </label>
+        </div>
+        <div class="bem-sep"></div>
         <div class="bem-field" style="justify-content:flex-end">
           <label style="visibility:hidden">-</label>
           <button class="bem-btn-apply" onclick="bemAplicar()">⚡ Aplicar cambios</button>
@@ -6360,6 +6377,32 @@ function bemSelLinea(){
 function bemSelTodos(){document.querySelectorAll('.chk-reg').forEach(function(c){c.checked=true;});actualizarSelReg();}
 function bemDeselTodos(){document.querySelectorAll('.chk-reg').forEach(function(c){c.checked=false;});actualizarSelReg();}
 
+function bemToggleDesayuno(checked){
+  var lbl=document.querySelector('#bemAplicaDesayuno + span');
+  if(lbl) lbl.textContent = checked ? '✅ 10:00–10:15 (−15 min)' : 'Aplica 10:00–10:15';
+}
+
+function bemToggleColacion(checked){
+  var lbl=document.querySelector('#bemAplicaColacion + span');
+  if(!lbl) return;
+  if(checked) lbl.textContent='✅ Según turno (−30 min)';
+  else lbl.textContent='Aplica según turno';
+}
+
+// Calcula horas de desayuno/colación igual que el formulario
+function _bemHorasDesayuno(fecha){
+  // Desayuno: siempre 10:00–10:15 de la fecha dada
+  var d = fecha ? fecha.substring(0,10) : '';
+  return { ini: d+'T10:00:00', ter: d+'T10:15:00' };
+}
+function _bemHorasColacion(fecha, turno){
+  var d = fecha ? fecha.substring(0,10) : '';
+  var t = String(turno||'').toLowerCase();
+  if(t==='noche')  return { ini: d+'T23:00:00', ter: d+'T23:30:00' };
+  if(t==='tarde')  return { ini: d+'T21:00:00', ter: d+'T21:30:00' };
+  return               { ini: d+'T12:00:00', ter: d+'T12:30:00' };
+}
+
 // Abre modal de confirmación con preview de los cambios
 function bemAplicar(){
   var ids=Array.from(document.querySelectorAll('.chk-reg:checked')).map(function(c){return c.value;});
@@ -6379,6 +6422,10 @@ function bemAplicar(){
   if(operacion) cambios.operacion=operacion;
   if(hi)        cambios.proceso_inicio=hi;
   if(hc)        cambios.proceso_termino=hc;
+  var aplDesayuno = document.getElementById('bemAplicaDesayuno') && document.getElementById('bemAplicaDesayuno').checked;
+  var aplColacion = document.getElementById('bemAplicaColacion') && document.getElementById('bemAplicaColacion').checked;
+  if(aplDesayuno) cambios._desayuno=true;
+  if(aplColacion) cambios._colacion=true;
 
   if(!Object.keys(cambios).length){showToast('Define al menos un campo para copiar','warning');return;}
 
@@ -6397,12 +6444,14 @@ function bemAplicar(){
   });
 
   // Construir preview
-  var labels={'especie':'Especie','producto':'Producto','proceso':'Proceso','operacion':'Operación','proceso_inicio':'Hora Inicio','proceso_termino':'Hora Corte'};
+  var labels={'especie':'Especie','producto':'Producto','proceso':'Proceso','operacion':'Operación','proceso_inicio':'Hora Inicio','proceso_termino':'Hora Corte','_desayuno':'Desayuno','_colacion':'Colación'};
   var preview=Object.keys(cambios).map(function(k){
+    if(!labels[k]) return '';
+    var val = (k==='_desayuno'||k==='_colacion') ? '✅ Aplica' : escTxt(cambios[k]);
     return '<div style="display:flex;gap:8px;align-items:center;padding:4px 0;border-bottom:1px solid #1e4060">'
-      +'<span style="color:#8ab;font-size:11px;width:100px;flex-shrink:0">'+labels[k]+'</span>'
-      +'<span style="color:#0098d4;font-weight:700">'+escTxt(cambios[k])+'</span></div>';
-  }).join('');
+      +'<span style="color:#8ab;font-size:11px;width:110px;flex-shrink:0">'+labels[k]+'</span>'
+      +'<span style="color:#0098d4;font-weight:700">'+val+'</span></div>';
+  }).filter(Boolean).join('');
 
   var modal=document.getElementById('bemModal');
   var modalBody=document.getElementById('bemModalBody');
@@ -6441,6 +6490,8 @@ async function bemConfirmar(){
     //          r[10]=especie r[11]=producto r[12]=proceso r[13]=operacion
     //          r[14]=proc_ini r[15]=proc_ter r[16]=atraso r[17]=desc_ini r[18]=desc_ter
     //          r[19]=desay_prog r[20]=col_ini r[21]=col_ter r[22]=col_prog r[24]=id
+    var hDesc = cambios._desayuno ? _bemHorasDesayuno(r[1]) : null;
+    var hCol  = cambios._colacion ? _bemHorasColacion(r[1], r[3]) : null;
     var nuevo={
       mes:          r[0]||'',
       fecha:        r[1]||'',
@@ -6459,12 +6510,12 @@ async function bemConfirmar(){
       proceso_inicio:  cambios.proceso_inicio  || r[14]||null,
       proceso_termino: cambios.proceso_termino || r[15]||null,
       atraso_inicio:   r[16]||'0',
-      descanso_inicio: r[17]||null,
-      descanso_termino:r[18]||null,
-      desayuno_programado:r[19]||'',
-      colacion_inicio: r[20]||null,
-      colacion_termino:r[21]||null,
-      colacion_programado:r[22]||''
+      descanso_inicio:  hDesc ? hDesc.ini : (r[17]||null),
+      descanso_termino: hDesc ? hDesc.ter : (r[18]||null),
+      desayuno_programado: cambios._desayuno ? 'Programado' : (r[19]||''),
+      colacion_inicio:  hCol ? hCol.ini : (r[20]||null),
+      colacion_termino: hCol ? hCol.ter : (r[21]||null),
+      colacion_programado: cambios._colacion ? 'Programado' : (r[22]||'')
     };
 
     try{
